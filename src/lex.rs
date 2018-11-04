@@ -449,6 +449,15 @@ let add = fn(x, y) {
 };
 
 let result = add(five, ten);
+
+10 == 10;
+10!=9;
+
+if (5 < 10) {
+    return true;
+} else {
+    return false;
+}
 "#;
     let expected: Vec<Token> = vec![
         ("let", TokenKind::Let),
@@ -490,6 +499,33 @@ let result = add(five, ten);
         ("ten", TokenKind::Identifier),
         (")", TokenKind::RParen),
         (";", TokenKind::Semicolon),
+
+        ("10", TokenKind::Integer),
+        ("==", TokenKind::EqualTo),
+        ("10", TokenKind::Integer),
+        (";", TokenKind::Semicolon),
+        ("10", TokenKind::Integer),
+        ("!=", TokenKind::NotEqualTo),
+        ("9", TokenKind::Integer),
+        (";", TokenKind::Semicolon),
+
+        ("if", TokenKind::If),
+        ("(", TokenKind::LParen),
+        ("5", TokenKind::Integer),
+        ("<", TokenKind::LessThan),
+        ("10", TokenKind::Integer),
+        (")", TokenKind::RParen),
+        ("{", TokenKind::LBrace),
+        ("return", TokenKind::Return),
+        ("true", TokenKind::True),
+        (";", TokenKind::Semicolon),
+        ("}", TokenKind::RBrace),
+        ("else", TokenKind::Else),
+        ("{", TokenKind::LBrace),
+        ("return", TokenKind::Return),
+        ("false", TokenKind::False),
+        (";", TokenKind::Semicolon),
+        ("}", TokenKind::RBrace),
         
         ("", TokenKind::EOF),
     ].into_iter().map(|(c, t)| Token::basic(c, t)).collect();
