@@ -9,8 +9,18 @@ pub enum TokenKind {
     Integer,    // [0-9]+
 
     // Operators
-    Assign, // =
-    Plus,   // +
+    Assign,             // =
+    Plus,               // +
+    Minus,              // -
+    Asterisk,           // *
+    Slash,              // /
+    Exclamation,        // !
+    EqualTo,            // ==
+    NotEqualTo,         // !=
+    LessThan,           // <
+    GreaterThan,        // >
+    LessThanOrEqual,    // <=
+    GreaterThanOrEqual, // >=
     
     // Delimiters
     Comma,     // ,
@@ -25,6 +35,11 @@ pub enum TokenKind {
     // Keywords
     Function,
     Let,
+    If,
+    Else,
+    Return,
+    True,
+    False,
 }
 
 #[derive(Clone, Debug)]
@@ -45,6 +60,7 @@ impl Token {
         }
     }
 
+    #[allow(dead_code)]
     fn basic(literal: &str, kind: TokenKind) -> Token {
         Token {
             literal: literal.to_owned(),
@@ -109,10 +125,18 @@ impl Lexer {
 
         let mut single_chars = HashMap::new();
         for (c, t) in vec![
-            ('=', vec![(None, TokenKind::Assign)]),
+            ('=', vec![(None, TokenKind::Assign), (Some('='), TokenKind::EqualTo)]),
             ('+', vec![(None, TokenKind::Plus)]),
+            ('-', vec![(None, TokenKind::Minus)]),
+            ('*', vec![(None, TokenKind::Asterisk)]),
+            ('/', vec![(None, TokenKind::Slash)]),
+            ('!', vec![(None, TokenKind::Exclamation), (Some('='), TokenKind::NotEqualTo)]),
+            ('<', vec![(None, TokenKind::LessThan), (Some('='), TokenKind::LessThanOrEqual)]),
+            ('>', vec![(None, TokenKind::GreaterThan), (Some('='), TokenKind::GreaterThanOrEqual)]),
+
             (',', vec![(None, TokenKind::Comma)]),
             (';', vec![(None, TokenKind::Semicolon)]),
+            
             ('(', vec![(None, TokenKind::LParen)]),
             (')', vec![(None, TokenKind::RParen)]),
             ('{', vec![(None, TokenKind::LBrace)]),
@@ -125,6 +149,11 @@ impl Lexer {
         for (s, t) in vec![
             ("let", TokenKind::Let),
             ("fn", TokenKind::Function),
+            ("if", TokenKind::If),
+            ("else", TokenKind::Else),
+            ("return", TokenKind::Return),
+            ("true", TokenKind::True),
+            ("false", TokenKind::False),
         ] {
             keywords.insert(s.to_owned(), t);
         }
@@ -206,7 +235,7 @@ impl Lexer {
                 .next() {
                     Some((pc, t)) => {
                         if pc.is_some() {
-                            &self.read();
+                            literal += &self.read().unwrap().to_string();
                         }
                         kind = *t;
                     },
@@ -264,6 +293,7 @@ pub fn lex(src: &str) -> Vec<Token> {
     tokens
 }
 
+#[allow(dead_code)]
 fn test_comparisons(src: &str, expected: &[Token], actual: &[Token]) {
     let err_msg = format!("Unexpected number of tokens emitted from `{}`: expected {:?} found {:?}", src, expected, actual);
     assert_eq!(expected.len(), actual.len(), "{}", err_msg);
@@ -274,22 +304,41 @@ fn test_comparisons(src: &str, expected: &[Token], actual: &[Token]) {
 }
 
 #[test]
-fn test_lex_singles() {
+fn test_lex_specials() {
     let test_vectors: Vec<(String, Vec<Token>)> = vec![
         ("".to_owned(), vec![
             Token::basic("", TokenKind::EOF),
         ]),
-        ("=+,;(){}".to_owned(), vec![
+        ("=+-*/!,;(){}<> == != <= >=".to_owned(), vec![
             ("=", TokenKind::Assign),
             ("+", TokenKind::Plus),
+            ("-", TokenKind::Minus),
+            ("*", TokenKind::Asterisk),
+            ("/", TokenKind::Slash),
+            ("!", TokenKind::Exclamation),
             (",", TokenKind::Comma),
             (";", TokenKind::Semicolon),
             ("(", TokenKind::LParen),
             (")", TokenKind::RParen),
             ("{", TokenKind::LBrace),
             ("}", TokenKind::RBrace),
+            ("<", TokenKind::LessThan),
+            (">", TokenKind::GreaterThan),
+            ("==", TokenKind::EqualTo),
+            ("!=", TokenKind::NotEqualTo),
+            ("<=", TokenKind::LessThanOrEqual),
+            (">=", TokenKind::GreaterThanOrEqual),
             ("", TokenKind::EOF),
         ].into_iter().map(|(c, t)| Token::basic(c, t)).collect()),
+        // Possible two-character token is last character
+        ("!".to_owned(), vec![
+            Token::basic("!", TokenKind::Exclamation),
+            Token::basic("", TokenKind::EOF),
+        ]),
+        ("!=".to_owned(), vec![
+            Token::basic("!=", TokenKind::NotEqualTo),
+            Token::basic("", TokenKind::EOF),
+        ]),
     ];
 
     for test_vector in test_vectors {
@@ -303,9 +352,14 @@ fn test_lex_singles() {
 #[test]
 fn test_lex_keywords() {
     let test_vectors: Vec<(String, Vec<Token>)> = vec![
-        ("let fn".to_owned(), vec![
+        ("let fn if else return true false".to_owned(), vec![
             ("let", TokenKind::Let),
             ("fn", TokenKind::Function),
+            ("if", TokenKind::If),
+            ("else", TokenKind::Else),
+            ("return", TokenKind::Return),
+            ("true", TokenKind::True),
+            ("false", TokenKind::False),
             ("", TokenKind::EOF),
         ].into_iter().map(|(c, t)| Token::basic(c, t)).collect()),
     ];
