@@ -266,22 +266,12 @@ fn test_lex_keywords() {
 }
 
 #[test]
-fn test_lex_integer_assignment() {
+fn test_lex_integer() {
     let test_vectors: Vec<(String, Vec<Token>)> = vec![
-        ("let five = 5;".to_owned(), vec![
-            ("let", TokenKind::Let),
-            ("five", TokenKind::Identifier),
-            ("=", TokenKind::Assign),
+        ("5 10 123".to_owned(), vec![
             ("5", TokenKind::Integer),
-            (";", TokenKind::Semicolon),
-            ("", TokenKind::EOF),
-        ].into_iter().map(|(c, t)| Token::basic(c, t)).collect()),
-        ("let ten = 10;".to_owned(), vec![
-            ("let", TokenKind::Let),
-            ("ten", TokenKind::Identifier),
-            ("=", TokenKind::Assign),
             ("10", TokenKind::Integer),
-            (";", TokenKind::Semicolon),
+            ("123", TokenKind::Integer),
             ("", TokenKind::EOF),
         ].into_iter().map(|(c, t)| Token::basic(c, t)).collect()),
     ];
@@ -394,6 +384,7 @@ let result = add(five, ten);
         ("ten", TokenKind::Identifier),
         (")", TokenKind::RParen),
         (";", TokenKind::Semicolon),
+        
         ("", TokenKind::EOF),
     ].into_iter().map(|(c, t)| Token::basic(c, t)).collect();
     let actual = lex(&src);
