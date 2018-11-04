@@ -67,8 +67,39 @@ struct Lexer {
     cursor: usize,
     line_number: usize,
     char_number: usize,
-    single_char_tokens: HashMap<char, TokenKind>,
+    special_char_tokens: HashMap<char, Vec<(Option<char>, TokenKind)>>,
     keywords: HashMap<String, TokenKind>,
+}
+
+fn option_eq<T>(a: Option<T>, b: Option<T>) -> bool
+where
+    T: PartialEq
+{
+    match (a, b) {
+        (Some(l), Some(r)) => l == r,
+        (None, None) => true,
+        _ => false,
+    }
+}
+
+#[test]
+fn test_option_eq() {
+    let test_vectors = vec![
+        (Some('a'), Some('a'), true),
+        (Some('a'), None, false),
+        (None, Some('a'), false),
+        (None, None, true),
+    ];
+    for test_vector in test_vectors {
+        let (a, b, expected) = test_vector;
+        let actual = option_eq(a, b);
+        let op = match expected {
+            true => "==",
+            false => "!=",
+        };
+        let msg = format!("Expected {:?} {} {:?}", a, op, b);
+        assert_eq!(expected, actual, "{}", msg);
+    }
 }
 
 impl Lexer {
@@ -78,14 +109,14 @@ impl Lexer {
 
         let mut single_chars = HashMap::new();
         for (c, t) in vec![
-            ('=', TokenKind::Assign),
-            ('+', TokenKind::Plus),
-            (',', TokenKind::Comma),
-            (';', TokenKind::Semicolon),
-            ('(', TokenKind::LParen),
-            (')', TokenKind::RParen),
-            ('{', TokenKind::LBrace),
-            ('}', TokenKind::RBrace),
+            ('=', vec![(None, TokenKind::Assign)]),
+            ('+', vec![(None, TokenKind::Plus)]),
+            (',', vec![(None, TokenKind::Comma)]),
+            (';', vec![(None, TokenKind::Semicolon)]),
+            ('(', vec![(None, TokenKind::LParen)]),
+            (')', vec![(None, TokenKind::RParen)]),
+            ('{', vec![(None, TokenKind::LBrace)]),
+            ('}', vec![(None, TokenKind::RBrace)]),
         ] {
             single_chars.insert(c, t);
         }
@@ -104,7 +135,7 @@ impl Lexer {
             cursor: 0,
             line_number: 0,
             char_number: 0,
-            single_char_tokens: single_chars,
+            special_char_tokens: single_chars,
             keywords: keywords,
         }
     }
@@ -159,9 +190,30 @@ impl Lexer {
 
             literal += &c.to_string();
 
-            let single_char_t = self.single_char_tokens.get(&c);
+            let temp_char_map = self.special_char_tokens.clone();
+            let single_char_t = temp_char_map.get(&c);
             if single_char_t.is_some() {
-                kind = *single_char_t.unwrap();
+                let possible = single_char_t.unwrap();
+                let next_c = self.peek();
+                let default = possible.into_iter()
+                    .filter(|(pc, _)| pc.is_none())
+                    .map(|(_, t)| t)
+                    .next()
+                    .unwrap_or(&TokenKind::Illegal);
+                
+                match possible.into_iter()
+                .filter(|(pc, _)| option_eq(*pc, next_c))
+                .next() {
+                    Some((pc, t)) => {
+                        if pc.is_some() {
+                            &self.read();
+                        }
+                        kind = *t;
+                    },
+                    None => {
+                        kind = *default;
+                    },
+                }
                 break;
             }
 
