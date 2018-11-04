@@ -42,7 +42,7 @@ pub enum TokenKind {
     False,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Token {
     literal: String,
     kind: TokenKind,
@@ -72,6 +72,22 @@ impl Token {
 
     fn is_equivalent_to(&self, other: &Token) -> bool {
         self.literal == other.literal && self.kind == other.kind
+    }
+}
+
+impl std::fmt::Debug for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let display_text = match self.kind {
+            TokenKind::Identifier => format!("ID `{}`", self.literal),
+            TokenKind::Integer => format!("{}", self.literal),
+            TokenKind::Illegal => format!("Illegal {:?}", self.literal),
+            _ => format!("{:?}", self.kind),
+        };
+
+        match self.kind {
+            TokenKind::EOF => write!(f, "EOF"),
+            _ => write!(f, "[ {} {}:{} ]", display_text, self.line, self.character),
+        }
     }
 }
 
@@ -162,7 +178,7 @@ impl Lexer {
             src: chars,
             len: len,
             cursor: 0,
-            line_number: 0,
+            line_number: 1,
             char_number: 0,
             special_char_tokens: single_chars,
             keywords: keywords,
@@ -262,6 +278,14 @@ impl Lexer {
                 if !self.peek().unwrap_or('\0').is_alphanumeric() {
                     break
                 }
+            }
+
+            match kind {
+                TokenKind::EOF => {
+                    kind = TokenKind::Illegal;
+                    break;
+                },
+                _ => (),
             }
         }
 

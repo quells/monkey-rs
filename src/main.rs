@@ -1,3 +1,6 @@
+extern crate monkey;
+use monkey::repl;
+
 fn main() {
-    println!("Hello, world!");
+    repl::tokenize();
 }
