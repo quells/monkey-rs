@@ -32,7 +32,7 @@ pub fn tokenize() {
 
 use crate::parse::parse;
 
-pub fn parser() {
+pub fn parser(debug: bool) {
     println!("ctrl-c to quit");
     loop {
         let input = match read_line(Some("> ".to_owned())) {
@@ -46,7 +46,15 @@ pub fn parser() {
         let program = parse(&tokens);
         match program {
             Ok(program) => {
-                println!("{:?}", program);
+                if debug {
+                    for s in program.statements {
+                        println!("{:?}", s);
+                    }
+                } else {
+                    for s in program.statements {
+                        println!("{}", s);
+                    }
+                }
             },
             Err(e) => {
                 eprintln!("{}", e);

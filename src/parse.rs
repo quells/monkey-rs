@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::lex::{Token, TokenKind};
 
 pub trait Node {
@@ -6,7 +8,7 @@ pub trait Node {
 
 #[derive(Debug)]
 pub struct Program {
-    statements: Vec<Statement>,
+    pub statements: Vec<Statement>,
 }
 
 impl Program {
@@ -51,17 +53,39 @@ impl Node for Statement {
     }
 }
 
+impl std::fmt::Display for Statement {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let msg = match self {
+            Statement::InitialAssignment(_, id, value) => {
+                format!("let {} = {};", id, value)
+            },
+        };
+        write!(f, "{}", msg)
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum Expression {
     Identifier(Token),
-    Integer(Token),
+    Integer(Token, isize),
+    FunctionCall(Token, Vec<Expression>),
 }
 
 impl Expression {
     fn is_equivalent_to(&self, other: &Expression) -> bool {
         match (self, other) {
             (Expression::Identifier(l), Expression::Identifier(r)) => l.is_equivalent_to(r),
-            (Expression::Integer(l), Expression::Integer(r)) => l.is_equivalent_to(r),
+            (Expression::Integer(l, _), Expression::Integer(r, _)) => l.is_equivalent_to(r),
+            (Expression::FunctionCall(id_l, params_l), Expression::FunctionCall(id_r, params_r)) => {
+                if params_l.len() != params_r.len() {
+                    return false;
+                }
+                let param_acc = params_l.into_iter()
+                    .zip(params_r)
+                    .map(|(l, r)| l.is_equivalent_to(r))
+                    .fold(true, |a, b| a && b);
+                id_l.is_equivalent_to(id_r) && param_acc
+            }
             _ => false,
         }
     }
@@ -71,9 +95,30 @@ impl Node for Expression {
     fn token(&self) -> Option<Token> {
         let t = match self {
             Expression::Identifier(t) => t.clone(),
-            Expression::Integer(t) => t.clone(),
+            Expression::Integer(t, _) => t.clone(),
+            Expression::FunctionCall(t, _) => t.clone(),
         };
         Some(t)
+    }
+}
+
+impl std::fmt::Display for Expression {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let msg: String = match self {
+            Expression::Identifier(t) => t.literal.clone(),
+            Expression::Integer(t, _) => t.literal.clone(),
+            Expression::FunctionCall(id, params) => {
+                let param_strs = match params.split_first() {
+                    Some((first, rest)) => {
+                        rest.into_iter()
+                            .fold(format!("{}", first), |a, b| format!("{}, {}", a, b))
+                    },
+                    None => "".to_owned(),
+                };
+                format!("{}({})", id.literal, param_strs)
+            },
+        };
+        write!(f, "{}", msg)
     }
 }
 
@@ -84,6 +129,7 @@ pub enum ParseError {
     UnexpectedToken(Vec<TokenKind>, Token),
     UnexpectedEndOfTokens,
     IllegalToken(Token),
+    InvalidInteger(Token),
 }
 
 impl Error for ParseError {}
@@ -97,7 +143,10 @@ impl std::fmt::Display for ParseError {
             ParseError::UnexpectedEndOfTokens => "unexpected end of token stream".to_owned(),
             ParseError::IllegalToken(t) => {
                 format!("found illegal token {:?}", t)
-            }
+            },
+            ParseError::InvalidInteger(t) => {
+                format!("unable to parse `{}` as integer", t.literal)
+            },
         };
         write!(f, "{}", msg)
     }
@@ -188,11 +237,43 @@ impl Parser {
         match first_token.kind {
             TokenKind::Integer => {
                 let int = self.eat(TokenKind::Integer)?;
-                Ok(Expression::Integer(int))
+                let parsed = match isize::from_str(&int.literal) {
+                    Ok(x) => x,
+                    Err(_) => return Err(ParseError::InvalidInteger(int)),
+                };
+                Ok(Expression::Integer(int, parsed))
             },
             TokenKind::Identifier => {
                 let id = self.eat(TokenKind::Identifier)?;
-                Ok(Expression::Identifier(id))
+                let default = Ok(Expression::Identifier(id.clone()));
+                let next_token = match self.peek() {
+                    Some(t) => t,
+                    None => return default,
+                };
+                match next_token.kind {
+                    TokenKind::LParen => {
+                        self.eat(TokenKind::LParen)?;
+                        let mut params = Vec::new();
+                        loop {
+                            let maybe_close = match self.peek() {
+                                Some(t) => t,
+                                None => return Err(ParseError::UnexpectedEndOfTokens),
+                            };
+                            if maybe_close.kind == TokenKind::RParen {
+                                self.eat(TokenKind::RParen)?;
+                                break;
+                            }
+
+                            if params.len() > 0 {
+                                self.eat(TokenKind::Comma)?;
+                            }
+                            let expr = self.next_expression()?;
+                            params.push(expr);
+                        }
+                        Ok(Expression::FunctionCall(id, params))
+                    },
+                    _ => default,
+                }
             },
             _ => {
                 return Err(ParseError::UnexpectedToken(vec![TokenKind::Integer, TokenKind::Identifier], first_token));
@@ -251,7 +332,7 @@ mod test {
         let first_expected = Statement::InitialAssignment(
             Token::basic("let", TokenKind::Let), 
             Expression::Identifier(Token::basic("abc", TokenKind::Identifier)),
-            Expression::Integer(Token::basic("123", TokenKind::Integer)),
+            Expression::Integer(Token::basic("123", TokenKind::Integer), 123),
         );
         let first_actual = statements.next().unwrap();
         assert!(first_actual.is_equivalent_to(&first_expected));
