@@ -236,7 +236,7 @@ mod test {
     fn initial_assignment() {
         let valid_src = r#"
             let abc = 123;
-            let xyz = 456;
+            let xyz = abc;
         "#;
 
         let tokens = lex(&valid_src);
@@ -259,7 +259,7 @@ mod test {
         let second_expected = Statement::InitialAssignment(
             Token::basic("let", TokenKind::Let), 
             Expression::Identifier(Token::basic("xyz", TokenKind::Identifier)),
-            Expression::Integer(Token::basic("456", TokenKind::Integer)),
+            Expression::Identifier(Token::basic("abc", TokenKind::Identifier)),
         );
         let second_actual = statements.next().unwrap();
         assert!(second_actual.is_equivalent_to(&second_expected));
