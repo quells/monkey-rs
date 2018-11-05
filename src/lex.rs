@@ -70,6 +70,7 @@ impl Token {
         }
     }
 
+    #[allow(dead_code)]
     fn is_equivalent_to(&self, other: &Token) -> bool {
         self.literal == other.literal && self.kind == other.kind
     }
@@ -297,6 +298,7 @@ pub fn lex(src: &str) -> Vec<Token> {
     tokens
 }
 
+#[cfg(test)]
 mod test {
     use crate::lex::{option_eq, lex, Token, TokenKind};
 
