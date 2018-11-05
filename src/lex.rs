@@ -44,10 +44,10 @@ pub enum TokenKind {
 
 #[derive(Clone)]
 pub struct Token {
-    literal: String,
-    kind: TokenKind,
-    line: usize,
-    character: usize,
+    pub literal: String,
+    pub kind: TokenKind,
+    pub line: usize,
+    pub character: usize,
 }
 
 impl Token {
@@ -186,9 +186,7 @@ impl Lexer {
     }
 
     fn read(&mut self) -> Option<char> {
-        if self.cursor >= self.len {
-            None
-        } else {
+        if self.cursor < self.len {
             let c = self.src[self.cursor];
             self.cursor += 1;
 
@@ -199,6 +197,8 @@ impl Lexer {
             self.char_number += 1;
             
             Some(c)
+        } else {
+            None
         }
     }
 

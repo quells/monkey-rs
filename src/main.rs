@@ -2,5 +2,5 @@ extern crate monkey;
 use monkey::repl;
 
 fn main() {
-    repl::tokenize();
+    repl::parser();
 }
