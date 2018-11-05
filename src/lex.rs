@@ -51,7 +51,7 @@ pub struct Token {
 }
 
 impl Token {
-    fn new(literal: &str, kind: TokenKind, line: usize, character: usize) -> Token {
+    pub fn new(literal: &str, kind: TokenKind, line: usize, character: usize) -> Token {
         Token {
             literal: literal.to_owned(),
             kind: kind,
@@ -61,7 +61,7 @@ impl Token {
     }
 
     #[allow(dead_code)]
-    fn basic(literal: &str, kind: TokenKind) -> Token {
+    pub fn basic(literal: &str, kind: TokenKind) -> Token {
         Token {
             literal: literal.to_owned(),
             kind: kind,
@@ -70,8 +70,7 @@ impl Token {
         }
     }
 
-    #[allow(dead_code)]
-    fn is_equivalent_to(&self, other: &Token) -> bool {
+    pub fn is_equivalent_to(&self, other: &Token) -> bool {
         self.literal == other.literal && self.kind == other.kind
     }
 }
@@ -300,19 +299,19 @@ pub fn lex(src: &str) -> Vec<Token> {
 
 #[cfg(test)]
 mod test {
-    use crate::lex::{option_eq, lex, Token, TokenKind};
+    use crate::lex::{self, lex, Token, TokenKind};
 
 #[test]
-fn test_option_eq() {
-    let test_vectors = vec![
+fn option_eq() {
+    let vectors = vec![
         (Some('a'), Some('a'), true),
         (Some('a'), None, false),
         (None, Some('a'), false),
         (None, None, true),
     ];
-    for test_vector in test_vectors {
-        let (a, b, expected) = test_vector;
-        let actual = option_eq(a, b);
+    for vector in vectors {
+        let (a, b, expected) = vector;
+        let actual = lex::option_eq(a, b);
         let op = match expected {
             true => "==",
             false => "!=",
@@ -323,7 +322,7 @@ fn test_option_eq() {
 }
 
 #[allow(dead_code)]
-fn test_comparisons(src: &str, expected: &[Token], actual: &[Token]) {
+fn comparisons(src: &str, expected: &[Token], actual: &[Token]) {
     let err_msg = format!("Unexpected number of tokens emitted from `{}`: expected {:?} found {:?}", src, expected, actual);
     assert_eq!(expected.len(), actual.len(), "{}", err_msg);
     for (e, a) in expected.into_iter().zip(actual) {
@@ -333,8 +332,8 @@ fn test_comparisons(src: &str, expected: &[Token], actual: &[Token]) {
 }
 
 #[test]
-fn test_lex_specials() {
-    let test_vectors: Vec<(String, Vec<Token>)> = vec![
+fn specials() {
+    let vectors: Vec<(String, Vec<Token>)> = vec![
         ("".to_owned(), vec![
             Token::basic("", TokenKind::EOF),
         ]),
@@ -370,17 +369,17 @@ fn test_lex_specials() {
         ]),
     ];
 
-    for test_vector in test_vectors {
-        let (src, expected) = test_vector;
+    for vector in vectors {
+        let (src, expected) = vector;
         let actual = lex(&src);
-        test_comparisons(&src, &expected, &actual);
+        comparisons(&src, &expected, &actual);
     }
 }
 
 
 #[test]
-fn test_lex_keywords() {
-    let test_vectors: Vec<(String, Vec<Token>)> = vec![
+fn keywords() {
+    let vectors: Vec<(String, Vec<Token>)> = vec![
         ("let fn if else return true false".to_owned(), vec![
             ("let", TokenKind::Let),
             ("fn", TokenKind::Function),
@@ -393,16 +392,16 @@ fn test_lex_keywords() {
         ].into_iter().map(|(c, t)| Token::basic(c, t)).collect()),
     ];
 
-    for test_vector in test_vectors {
-        let (src, expected) = test_vector;
+    for vector in vectors {
+        let (src, expected) = vector;
         let actual = lex(&src);
-        test_comparisons(&src, &expected, &actual);
+        comparisons(&src, &expected, &actual);
     }
 }
 
 #[test]
-fn test_lex_integer() {
-    let test_vectors: Vec<(String, Vec<Token>)> = vec![
+fn integer() {
+    let vectors: Vec<(String, Vec<Token>)> = vec![
         ("5 10 123".to_owned(), vec![
             ("5", TokenKind::Integer),
             ("10", TokenKind::Integer),
@@ -411,15 +410,15 @@ fn test_lex_integer() {
         ].into_iter().map(|(c, t)| Token::basic(c, t)).collect()),
     ];
 
-    for test_vector in test_vectors {
-        let (src, expected) = test_vector;
+    for vector in vectors {
+        let (src, expected) = vector;
         let actual = lex(&src);
-        test_comparisons(&src, &expected, &actual);
+        comparisons(&src, &expected, &actual);
     }
 }
 
 #[test]
-fn test_lex_func() {
+fn func() {
     let src = r#"
 let add = fn(x, y) {
     x + y;
@@ -444,11 +443,11 @@ let add = fn(x, y) {
         ("", TokenKind::EOF),
     ].into_iter().map(|(c, t)| Token::basic(c, t)).collect();
     let actual = lex(&src);
-    test_comparisons(&src, &expected, &actual);
+    comparisons(&src, &expected, &actual);
 }
 
 #[test]
-fn test_lex_func_call() {
+fn func_call() {
     let src = "let result = add(five, ten);";
     let expected: Vec<Token> = vec![
         ("let", TokenKind::Let),
@@ -464,11 +463,11 @@ fn test_lex_func_call() {
         ("", TokenKind::EOF),
     ].into_iter().map(|(c, t)| Token::basic(c, t)).collect();
     let actual = lex(&src);
-    test_comparisons(&src, &expected, &actual);
+    comparisons(&src, &expected, &actual);
 }
 
 #[test]
-fn test_lex() {
+fn lexer() {
     let src = r#"
 let five = 5;
 let ten = 10;
@@ -559,7 +558,7 @@ if (5 < 10) {
         ("", TokenKind::EOF),
     ].into_iter().map(|(c, t)| Token::basic(c, t)).collect();
     let actual = lex(&src);
-    test_comparisons(&src, &expected, &actual);
+    comparisons(&src, &expected, &actual);
 }
 
 }
