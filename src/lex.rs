@@ -114,26 +114,6 @@ where
     }
 }
 
-#[test]
-fn test_option_eq() {
-    let test_vectors = vec![
-        (Some('a'), Some('a'), true),
-        (Some('a'), None, false),
-        (None, Some('a'), false),
-        (None, None, true),
-    ];
-    for test_vector in test_vectors {
-        let (a, b, expected) = test_vector;
-        let actual = option_eq(a, b);
-        let op = match expected {
-            true => "==",
-            false => "!=",
-        };
-        let msg = format!("Expected {:?} {} {:?}", a, op, b);
-        assert_eq!(expected, actual, "{}", msg);
-    }
-}
-
 impl Lexer {
     fn new(src: &str) -> Lexer {
         let chars: Vec<char> = src.chars().collect();
@@ -315,6 +295,29 @@ pub fn lex(src: &str) -> Vec<Token> {
     }
     tokens.push(Token::new("", TokenKind::EOF, lexer.line_number, lexer.char_number));
     tokens
+}
+
+mod test {
+    use crate::lex::{option_eq, lex, Token, TokenKind};
+
+#[test]
+fn test_option_eq() {
+    let test_vectors = vec![
+        (Some('a'), Some('a'), true),
+        (Some('a'), None, false),
+        (None, Some('a'), false),
+        (None, None, true),
+    ];
+    for test_vector in test_vectors {
+        let (a, b, expected) = test_vector;
+        let actual = option_eq(a, b);
+        let op = match expected {
+            true => "==",
+            false => "!=",
+        };
+        let msg = format!("Expected {:?} {} {:?}", a, op, b);
+        assert_eq!(expected, actual, "{}", msg);
+    }
 }
 
 #[allow(dead_code)]
@@ -555,4 +558,6 @@ if (5 < 10) {
     ].into_iter().map(|(c, t)| Token::basic(c, t)).collect();
     let actual = lex(&src);
     test_comparisons(&src, &expected, &actual);
+}
+
 }
