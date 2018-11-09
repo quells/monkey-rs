@@ -30,16 +30,21 @@ impl Node for Program {
 
 #[derive(Clone, Debug)]
 pub enum Statement {
-    InitialAssignment(Token, Expression, Expression),
+    Assignment(Token, Expression, Expression), // let `a` = `b`;
+    Return(Token, Expression), // return `a`;
 }
 
 impl Statement {
     #[allow(dead_code)]
     fn is_equivalent_to(&self, other: &Statement) -> bool {
         match (self, other) {
-            (Statement::InitialAssignment(let_l, id_l, expr_l), Statement::InitialAssignment(let_r, id_r, expr_r)) => {
+            (Statement::Assignment(let_l, id_l, expr_l), Statement::Assignment(let_r, id_r, expr_r)) => {
                 let_l.is_equivalent_to(let_r) && id_l.is_equivalent_to(id_r) && expr_l.is_equivalent_to(expr_r)
             },
+            (Statement::Return(return_l, value_l), Statement::Return(return_r, value_r)) => {
+                return_l.is_equivalent_to(return_r) && value_l.is_equivalent_to(value_r)
+            },
+            _ => false,
         }
     }
 }
@@ -47,7 +52,8 @@ impl Statement {
 impl Node for Statement {
     fn token(&self) -> Option<Token> {
         let t = match self {
-            Statement::InitialAssignment(t, _, _) => t.clone(),
+            Statement::Assignment(t, _, _) => t.clone(),
+            Statement::Return(t, _) => t.clone(),
         };
         Some(t)
     }
@@ -56,9 +62,12 @@ impl Node for Statement {
 impl std::fmt::Display for Statement {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let msg = match self {
-            Statement::InitialAssignment(_, id, value) => {
+            Statement::Assignment(_, id, value) => {
                 format!("let {} = {};", id, value)
             },
+            Statement::Return(_, value) => {
+                format!("return {};", value)
+            }
         };
         write!(f, "{}", msg)
     }
@@ -75,7 +84,9 @@ impl Expression {
     fn is_equivalent_to(&self, other: &Expression) -> bool {
         match (self, other) {
             (Expression::Identifier(l), Expression::Identifier(r)) => l.is_equivalent_to(r),
-            (Expression::Integer(l, _), Expression::Integer(r, _)) => l.is_equivalent_to(r),
+            (Expression::Integer(literal_l, parsed_l), Expression::Integer(literal_r, parsed_r)) => {
+                literal_l.is_equivalent_to(literal_r) && parsed_l == parsed_r
+            },
             (Expression::FunctionCall(id_l, params_l), Expression::FunctionCall(id_r, params_r)) => {
                 if params_l.len() != params_r.len() {
                     return false;
@@ -218,8 +229,14 @@ impl Parser {
                 self.eat(TokenKind::Assign)?;
                 let expr = self.next_expression()?;
                 self.eat(TokenKind::Semicolon)?;
-                Ok(Statement::InitialAssignment(_let, Expression::Identifier(id), expr))
+                Ok(Statement::Assignment(_let, Expression::Identifier(id), expr))
             },
+            TokenKind::Return => {
+                let _return = self.eat(TokenKind::Return)?;
+                let value = self.next_expression()?;
+                self.eat(TokenKind::Semicolon)?;
+                Ok(Statement::Return(_return, value))
+            }
             _ => {
                 return Err(ParseError::UnexpectedToken(vec![TokenKind::Let], first_token));
             }
@@ -329,7 +346,7 @@ mod test {
         let src = "let abc = 123;";
         let actual = setup(&src, 1).statements.into_iter().next().unwrap();
 
-        let expected = Statement::InitialAssignment(
+        let expected = Statement::Assignment(
             Token::basic("let", TokenKind::Let), 
             Expression::Identifier(Token::basic("abc", TokenKind::Identifier)),
             Expression::Integer(Token::basic("123", TokenKind::Integer), 123),
@@ -343,7 +360,7 @@ mod test {
         let src = "let xyz = abc;";
         let actual = setup(&src, 1).statements.into_iter().next().unwrap();
 
-        let expected = Statement::InitialAssignment(
+        let expected = Statement::Assignment(
             Token::basic("let", TokenKind::Let), 
             Expression::Identifier(Token::basic("xyz", TokenKind::Identifier)),
             Expression::Identifier(Token::basic("abc", TokenKind::Identifier)),
@@ -357,13 +374,13 @@ mod test {
         let src = "let sum = add(1, abc);";
         let actual = setup(&src, 1).statements.into_iter().next().unwrap();
 
-        let expected = Statement::InitialAssignment(
+        let expected = Statement::Assignment(
             Token::basic("let", TokenKind::Let),
             Expression::Identifier(Token::basic("sum", TokenKind::Identifier)),
             Expression::FunctionCall(
                 Token::basic("add", TokenKind::Identifier),
                 vec![
-                    Expression::Integer(Token::basic("1", TokenKind::Integer), 0),
+                    Expression::Integer(Token::basic("1", TokenKind::Integer), 1),
                     Expression::Identifier(Token::basic("abc", TokenKind::Identifier)),
                 ]
             )
@@ -377,24 +394,57 @@ mod test {
         let src = "let sum = add(1, add(2, 3));";
         let actual = setup(&src, 1).statements.into_iter().next().unwrap();
 
-        let expected = Statement::InitialAssignment(
+        let expected = Statement::Assignment(
             Token::basic("let", TokenKind::Let),
             Expression::Identifier(Token::basic("sum", TokenKind::Identifier)),
             Expression::FunctionCall(
                 Token::basic("add", TokenKind::Identifier),
                 vec![
-                    Expression::Integer(Token::basic("1", TokenKind::Integer), 0),
+                    Expression::Integer(Token::basic("1", TokenKind::Integer), 1),
                     Expression::FunctionCall(
                         Token::basic("add", TokenKind::Identifier),
                         vec![
-                            Expression::Integer(Token::basic("2", TokenKind::Integer), 0),
-                            Expression::Integer(Token::basic("3", TokenKind::Integer), 0),
+                            Expression::Integer(Token::basic("2", TokenKind::Integer), 2),
+                            Expression::Integer(Token::basic("3", TokenKind::Integer), 3),
                         ]
                     )
                 ]
             )
         );
 
+        assert!(actual.is_equivalent_to(&expected));
+    }
+
+    #[test]
+    fn return_statement() {
+        let mut src = "return 1;";
+        let mut actual = setup(&src, 1).statements.into_iter().next().unwrap();
+        let mut expected = Statement::Return(
+            Token::basic("return", TokenKind::Return),
+            Expression::Integer(Token::basic("1", TokenKind::Integer), 1)
+        );
+        assert!(actual.is_equivalent_to(&expected));
+
+        src = "return abc;";
+        actual = setup(&src, 1).statements.into_iter().next().unwrap();
+        expected = Statement::Return(
+            Token::basic("return", TokenKind::Return),
+            Expression::Identifier(Token::basic("abc", TokenKind::Identifier))
+        );
+        assert!(actual.is_equivalent_to(&expected));
+
+        src = "return add(2, 3);";
+        actual = setup(&src, 1).statements.into_iter().next().unwrap();
+        expected = Statement::Return(
+            Token::basic("return", TokenKind::Return),
+            Expression::FunctionCall(
+                Token::basic("add", TokenKind::Identifier),
+                vec![
+                    Expression::Integer(Token::basic("2", TokenKind::Integer), 2),
+                    Expression::Integer(Token::basic("3", TokenKind::Integer), 3),
+                ]
+            )
+        );
         assert!(actual.is_equivalent_to(&expected));
     }
 }
