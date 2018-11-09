@@ -318,6 +318,7 @@ mod test {
         let valid_src = r#"
             let abc = 123;
             let xyz = abc;
+            let sum = add(0, abc, add());
         "#;
 
         let tokens = lex(&valid_src);
@@ -326,7 +327,7 @@ mod test {
         assert!(parsed.is_ok(), "could not parse program: {}", parsed.unwrap_err());
         let program = parsed.unwrap();
 
-        assert_eq!(2, program.statements.len());
+        assert_eq!(3, program.statements.len());
         let mut statements = (&program.statements).into_iter();
         
         let first_expected = Statement::InitialAssignment(
@@ -344,6 +345,23 @@ mod test {
         );
         let second_actual = statements.next().unwrap();
         assert!(second_actual.is_equivalent_to(&second_expected));
-    }
 
+        let third_expected = Statement::InitialAssignment(
+            Token::basic("let", TokenKind::Let),
+            Expression::Identifier(Token::basic("sum", TokenKind::Identifier)),
+            Expression::FunctionCall(
+                Token::basic("add", TokenKind::Identifier),
+                vec![
+                    Expression::Integer(Token::basic("0", TokenKind::Integer), 0),
+                    Expression::Identifier(Token::basic("abc", TokenKind::Identifier)),
+                    Expression::FunctionCall(
+                        Token::basic("add", TokenKind::Identifier),
+                        Vec::new()
+                    ),
+                ]
+            )
+        );
+        let third_actual = statements.next().unwrap();
+        assert!(third_actual.is_equivalent_to(&third_expected));
+    }
 }
