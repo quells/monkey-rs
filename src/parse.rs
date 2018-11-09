@@ -311,57 +311,90 @@ mod test {
     use crate::lex::lex;
     use crate::lex::{Token, TokenKind};
     use crate::parse::parse;
-    use crate::parse::{Statement, Expression};
+    use crate::parse::{Program, Statement, Expression};
 
-    #[test]
-    fn initial_assignment() {
-        let valid_src = r#"
-            let abc = 123;
-            let xyz = abc;
-            let sum = add(0, abc, add());
-        "#;
-
-        let tokens = lex(&valid_src);
+    fn setup(src: &str, expected_statement_count: usize) -> Program {
+        let tokens = lex(&src);
         let parsed = parse(&tokens);
-        
+
         assert!(parsed.is_ok(), "could not parse program: {}", parsed.unwrap_err());
         let program = parsed.unwrap();
 
-        assert_eq!(3, program.statements.len());
-        let mut statements = (&program.statements).into_iter();
-        
-        let first_expected = Statement::InitialAssignment(
+        assert_eq!(expected_statement_count, program.statements.len());
+        program
+    }
+
+    #[test]
+    fn assign_int() {
+        let src = "let abc = 123;";
+        let actual = setup(&src, 1).statements.into_iter().next().unwrap();
+
+        let expected = Statement::InitialAssignment(
             Token::basic("let", TokenKind::Let), 
             Expression::Identifier(Token::basic("abc", TokenKind::Identifier)),
             Expression::Integer(Token::basic("123", TokenKind::Integer), 123),
         );
-        let first_actual = statements.next().unwrap();
-        assert!(first_actual.is_equivalent_to(&first_expected));
-        
-        let second_expected = Statement::InitialAssignment(
+
+        assert!(actual.is_equivalent_to(&expected));
+    }
+
+    #[test]
+    fn assign_identifier() {
+        let src = "let xyz = abc;";
+        let actual = setup(&src, 1).statements.into_iter().next().unwrap();
+
+        let expected = Statement::InitialAssignment(
             Token::basic("let", TokenKind::Let), 
             Expression::Identifier(Token::basic("xyz", TokenKind::Identifier)),
             Expression::Identifier(Token::basic("abc", TokenKind::Identifier)),
         );
-        let second_actual = statements.next().unwrap();
-        assert!(second_actual.is_equivalent_to(&second_expected));
 
-        let third_expected = Statement::InitialAssignment(
+        assert!(actual.is_equivalent_to(&expected));
+    }
+
+    #[test]
+    fn assign_fn_call() {
+        let src = "let sum = add(1, abc);";
+        let actual = setup(&src, 1).statements.into_iter().next().unwrap();
+
+        let expected = Statement::InitialAssignment(
             Token::basic("let", TokenKind::Let),
             Expression::Identifier(Token::basic("sum", TokenKind::Identifier)),
             Expression::FunctionCall(
                 Token::basic("add", TokenKind::Identifier),
                 vec![
-                    Expression::Integer(Token::basic("0", TokenKind::Integer), 0),
+                    Expression::Integer(Token::basic("1", TokenKind::Integer), 0),
                     Expression::Identifier(Token::basic("abc", TokenKind::Identifier)),
-                    Expression::FunctionCall(
-                        Token::basic("add", TokenKind::Identifier),
-                        Vec::new()
-                    ),
                 ]
             )
         );
-        let third_actual = statements.next().unwrap();
-        assert!(third_actual.is_equivalent_to(&third_expected));
+
+        assert!(actual.is_equivalent_to(&expected));
+    }
+
+    #[test]
+    fn assign_nested_fn_call() {
+        let src = "let sum = add(1, add(2, 3));";
+        let actual = setup(&src, 1).statements.into_iter().next().unwrap();
+
+        let expected = Statement::InitialAssignment(
+            Token::basic("let", TokenKind::Let),
+            Expression::Identifier(Token::basic("sum", TokenKind::Identifier)),
+            Expression::FunctionCall(
+                Token::basic("add", TokenKind::Identifier),
+                vec![
+                    Expression::Integer(Token::basic("1", TokenKind::Integer), 0),
+                    Expression::FunctionCall(
+                        Token::basic("add", TokenKind::Identifier),
+                        vec![
+                            Expression::Integer(Token::basic("2", TokenKind::Integer), 0),
+                            Expression::Integer(Token::basic("3", TokenKind::Integer), 0),
+                        ]
+                    )
+                ]
+            )
+        );
+
+        assert!(actual.is_equivalent_to(&expected));
     }
 }
