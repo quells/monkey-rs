@@ -3,6 +3,14 @@ use std::collections::HashSet;
 
 use crate::lex::{Token, TokenKind};
 
+trait EquivalentTo {
+    fn is_equivalent_to(&self, other: &Self) -> bool;
+}
+
+pub trait ToExpression {
+    fn to_expression(&self) -> Expression;
+}
+
 #[derive(Debug)]
 pub struct Program {
     pub statements: Vec<Statement>,
@@ -18,12 +26,11 @@ impl Program {
 
 #[derive(Clone, Debug)]
 pub enum Statement {
-    Assignment(Token, Expression, Expression), // let `a` = `b`;
+    Assignment(Token, Identifier, Expression), // let `a` = `b`;
     Return(Token, Expression), // return `a`;
 }
 
-impl Statement {
-    #[allow(dead_code)]
+impl EquivalentTo for Statement {
     fn is_equivalent_to(&self, other: &Statement) -> bool {
         match (self, other) {
             (Statement::Assignment(let_l, id_l, expr_l), Statement::Assignment(let_r, id_r, expr_r)) => {
@@ -51,21 +58,185 @@ impl std::fmt::Display for Statement {
     }
 }
 
+macro_rules! impl_equivalent_to_binop {
+    ($this:ident, $child:ident, $binop: ident) => {
+        impl EquivalentTo for $this {
+            fn is_equivalent_to(&self, other: &Self) -> bool {
+                match (self, other) {
+                    ($this::Wrapped(l), $this::Wrapped(r)) => l.is_equivalent_to(r),
+                    ($this::$child(ll, lop, lr), $this::$child(rl, rop, rr)) => {
+                        lop == rop && ll.is_equivalent_to(rl) && lr.is_equivalent_to(rr)
+                    },
+                    _ => false,
+                }
+            }
+        }
+    }
+}
+
+macro_rules! impl_display_binop_node {
+    ($this:ident, $child:ident) => {
+        impl std::fmt::Display for $this {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                match self {
+                    $this::Wrapped(w) => w.fmt(f),
+                    $this::$child(l, op, r) => write!(f, "{} {} {}", l, op, r),
+                }
+            }
+        }
+    }
+}
+
+macro_rules! impl_display_binop {
+    ($this:ident; $( $op:tt, $literal:expr );+ ) => {
+        impl std::fmt::Display for $this {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                match self {
+                    $(
+                        $this::$op => write!(f, "{}", $literal)
+                    ),*
+                }
+            }
+        }
+    }
+}
+
+type Expression = Box<EqualityExpr>;
+
 #[derive(Clone, Debug)]
-pub enum Expression {
-    Identifier(Token),
+pub enum EqualityExpr {
+    Wrapped(RelationalExpr),
+    Equality(RelationalExpr, EqualityBinOp, RelationalExpr),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum EqualityBinOp {
+    Equal,
+    NotEqual,
+}
+
+impl_equivalent_to_binop!(EqualityExpr, Equality, EqualityBinOp);
+impl_display_binop_node!(EqualityExpr, Equality);
+impl_display_binop!(
+    EqualityBinOp;
+    Equal, "==";
+    NotEqual, "!="
+);
+
+impl ToExpression for EqualityExpr {
+    fn to_expression(&self) -> Expression {
+        Box::new(self.clone())
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum RelationalExpr {
+    Wrapped(AdditiveExpr),
+    Relational(AdditiveExpr, RelationalBinOp, AdditiveExpr),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum RelationalBinOp {
+    LessThan,
+    LessThanEqual,
+    GreaterThanEqual,
+    GreaterThan,
+}
+
+impl_equivalent_to_binop!(RelationalExpr, Relational, RelationalBinOp);
+impl_display_binop_node!(RelationalExpr, Relational);
+impl_display_binop!(
+    RelationalBinOp; 
+    LessThan, "<";
+    LessThanEqual, "<=";
+    GreaterThan, ">";
+    GreaterThanEqual, ">="
+);
+
+impl ToExpression for RelationalExpr {
+    fn to_expression(&self) -> Expression {
+        Box::new(
+            EqualityExpr::Wrapped(self.clone())
+        )
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum AdditiveExpr {
+    Wrapped(Term),
+    Additive(Term, AdditiveBinOp, Term),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum AdditiveBinOp {
+    Add,
+    Subtract,
+}
+
+impl_equivalent_to_binop!(AdditiveExpr, Additive, AdditiveBinOp);
+impl_display_binop_node!(AdditiveExpr, Additive);
+impl_display_binop!(
+    AdditiveBinOp;
+    Add, "+";
+    Subtract, "-"
+);
+
+impl ToExpression for AdditiveExpr {
+    fn to_expression(&self) -> Expression {
+        Box::new(
+            EqualityExpr::Wrapped(
+                RelationalExpr::Wrapped(self.clone())
+        ))
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum Term {
+    Wrapped(Factor),
+    Term(Factor, TermBinOp, Factor),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum TermBinOp {
+    Multiply,
+    Divide,
+}
+
+impl_equivalent_to_binop!(Term, Term, TermBinOp);
+impl_display_binop_node!(Term, Term);
+impl_display_binop!(
+    TermBinOp;
+    Multiply, "*";
+    Divide, "/"
+);
+
+impl ToExpression for Term {
+    fn to_expression(&self) -> Expression {
+        Box::new(
+            EqualityExpr::Wrapped(
+                RelationalExpr::Wrapped(
+                    AdditiveExpr::Wrapped(self.clone())
+        )))
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum Factor {
+    Wrapped(Expression),
+    Identifier(Identifier),
     Integer(Token, isize),
     FunctionCall(Token, Vec<Expression>),
 }
 
-impl Expression {
-    fn is_equivalent_to(&self, other: &Expression) -> bool {
+impl EquivalentTo for Factor {
+    fn is_equivalent_to(&self, other: &Factor) -> bool {
         match (self, other) {
-            (Expression::Identifier(l), Expression::Identifier(r)) => l.is_equivalent_to(r),
-            (Expression::Integer(literal_l, parsed_l), Expression::Integer(literal_r, parsed_r)) => {
+            (Factor::Wrapped(l), Factor::Wrapped(r)) => l.is_equivalent_to(r),
+            (Factor::Identifier(l), Factor::Identifier(r)) => l.is_equivalent_to(r),
+            (Factor::Integer(literal_l, parsed_l), Factor::Integer(literal_r, parsed_r)) => {
                 literal_l.is_equivalent_to(literal_r) && parsed_l == parsed_r
             },
-            (Expression::FunctionCall(id_l, params_l), Expression::FunctionCall(id_r, params_r)) => {
+            (Factor::FunctionCall(id_l, params_l), Factor::FunctionCall(id_r, params_r)) => {
                 if params_l.len() != params_r.len() {
                     return false;
                 }
@@ -80,12 +251,31 @@ impl Expression {
     }
 }
 
-impl std::fmt::Display for Expression {
+impl ToExpression for Factor {
+    fn to_expression(&self) -> Expression {
+        let wrapped = |v: &Self| Box::new(
+            EqualityExpr::Wrapped(
+                RelationalExpr::Wrapped(
+                    AdditiveExpr::Wrapped(
+                        Term::Wrapped(v.clone())
+        ))));
+
+        match self {
+            Factor::Wrapped(e) => e.clone(),
+            Factor::Identifier(_) => wrapped(self),
+            Factor::Integer(_, _) => wrapped(self),
+            Factor::FunctionCall(_, _) => wrapped(self),
+        }
+    }
+}
+
+impl std::fmt::Display for Factor {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let msg: String = match self {
-            Expression::Identifier(t) => t.literal.clone(),
-            Expression::Integer(t, _) => t.literal.clone(),
-            Expression::FunctionCall(id, params) => {
+            Factor::Wrapped(e) => format!("{}", e),
+            Factor::Identifier(t) => t.0.literal.clone(),
+            Factor::Integer(t, _) => t.literal.clone(),
+            Factor::FunctionCall(id, params) => {
                 let param_strs = match params.split_first() {
                     Some((first, rest)) => {
                         rest.into_iter()
@@ -97,6 +287,21 @@ impl std::fmt::Display for Expression {
             },
         };
         write!(f, "{}", msg)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Identifier(Token);
+
+impl std::fmt::Display for Identifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.0.literal)
+    }
+}
+
+impl EquivalentTo for Identifier {
+    fn is_equivalent_to(&self, other: &Self) -> bool {
+        self.0.is_equivalent_to(&other.0)
     }
 }
 
@@ -223,7 +428,7 @@ impl Parser {
                 self.eat(TokenKind::Assign)?;
                 let expr = self.next_expression()?;
                 self.eat(TokenKind::Semicolon)?;
-                Ok(Statement::Assignment(_let, Expression::Identifier(id), expr))
+                Ok(Statement::Assignment(_let, Identifier(id), expr))
             },
             TokenKind::Return => {
                 let _return = self.eat(TokenKind::Return)?;
@@ -252,11 +457,11 @@ impl Parser {
                     Ok(x) => x,
                     Err(_) => return Err(ParseError::InvalidInteger(int)),
                 };
-                Ok(Expression::Integer(int, parsed))
+                Ok(Factor::Integer(int, parsed).to_expression())
             },
             TokenKind::Identifier => {
                 let id = self.eat(TokenKind::Identifier)?;
-                let default = Ok(Expression::Identifier(id.clone()));
+                let default = Ok(Factor::Identifier(Identifier(id.clone())).to_expression());
                 let next_token = match self.peek() {
                     Some(t) => t,
                     None => return default,
@@ -281,7 +486,7 @@ impl Parser {
                             let expr = self.next_expression()?;
                             params.push(expr);
                         }
-                        Ok(Expression::FunctionCall(id, params))
+                        Ok(Factor::FunctionCall(id, params).to_expression())
                     },
                     _ => default,
                 }
@@ -328,7 +533,8 @@ mod test {
     use crate::lex::lex;
     use crate::lex::{Token, TokenKind};
     use crate::parse::parse;
-    use crate::parse::{Program, Statement, Expression, ParseError};
+    use crate::parse::{Program, Statement, Factor, Identifier, ParseError};
+    use crate::parse::{ToExpression, EquivalentTo};
 
     fn setup(src: &str, expected_statement_count: usize) -> Program {
         let tokens = lex(&src);
@@ -348,8 +554,8 @@ mod test {
 
         let expected = Statement::Assignment(
             Token::basic("let", TokenKind::Let), 
-            Expression::Identifier(Token::basic("abc", TokenKind::Identifier)),
-            Expression::Integer(Token::basic("123", TokenKind::Integer), 123),
+            Identifier(Token::basic("abc", TokenKind::Identifier)),
+            Factor::Integer(Token::basic("123", TokenKind::Integer), 123).to_expression(),
         );
 
         assert!(actual.is_equivalent_to(&expected));
@@ -362,8 +568,8 @@ mod test {
 
         let expected = Statement::Assignment(
             Token::basic("let", TokenKind::Let), 
-            Expression::Identifier(Token::basic("xyz", TokenKind::Identifier)),
-            Expression::Identifier(Token::basic("abc", TokenKind::Identifier)),
+            Identifier(Token::basic("xyz", TokenKind::Identifier)),
+            Factor::Identifier(Identifier(Token::basic("abc", TokenKind::Identifier))).to_expression(),
         );
 
         assert!(actual.is_equivalent_to(&expected));
@@ -376,14 +582,14 @@ mod test {
 
         let expected = Statement::Assignment(
             Token::basic("let", TokenKind::Let),
-            Expression::Identifier(Token::basic("sum", TokenKind::Identifier)),
-            Expression::FunctionCall(
+            Identifier(Token::basic("sum", TokenKind::Identifier)),
+            Factor::FunctionCall(
                 Token::basic("add", TokenKind::Identifier),
                 vec![
-                    Expression::Integer(Token::basic("1", TokenKind::Integer), 1),
-                    Expression::Identifier(Token::basic("abc", TokenKind::Identifier)),
+                    Factor::Integer(Token::basic("1", TokenKind::Integer), 1).to_expression(),
+                    Factor::Identifier(Identifier(Token::basic("abc", TokenKind::Identifier))).to_expression(),
                 ]
-            )
+            ).to_expression()
         );
 
         assert!(actual.is_equivalent_to(&expected));
@@ -396,20 +602,20 @@ mod test {
 
         let expected = Statement::Assignment(
             Token::basic("let", TokenKind::Let),
-            Expression::Identifier(Token::basic("sum", TokenKind::Identifier)),
-            Expression::FunctionCall(
+            Identifier(Token::basic("sum", TokenKind::Identifier)),
+            Factor::FunctionCall(
                 Token::basic("add", TokenKind::Identifier),
                 vec![
-                    Expression::Integer(Token::basic("1", TokenKind::Integer), 1),
-                    Expression::FunctionCall(
+                    Factor::Integer(Token::basic("1", TokenKind::Integer), 1).to_expression(),
+                    Factor::FunctionCall(
                         Token::basic("add", TokenKind::Identifier),
                         vec![
-                            Expression::Integer(Token::basic("2", TokenKind::Integer), 2),
-                            Expression::Integer(Token::basic("3", TokenKind::Integer), 3),
+                            Factor::Integer(Token::basic("2", TokenKind::Integer), 2).to_expression(),
+                            Factor::Integer(Token::basic("3", TokenKind::Integer), 3).to_expression(),
                         ]
-                    )
+                    ).to_expression()
                 ]
-            )
+            ).to_expression()
         );
 
         assert!(actual.is_equivalent_to(&expected));
@@ -473,7 +679,7 @@ mod test {
         let mut actual = setup(&src, 1).statements.into_iter().next().unwrap();
         let mut expected = Statement::Return(
             Token::basic("return", TokenKind::Return),
-            Expression::Integer(Token::basic("1", TokenKind::Integer), 1)
+            Factor::Integer(Token::basic("1", TokenKind::Integer), 1).to_expression()
         );
         assert!(actual.is_equivalent_to(&expected));
 
@@ -481,7 +687,7 @@ mod test {
         actual = setup(&src, 1).statements.into_iter().next().unwrap();
         expected = Statement::Return(
             Token::basic("return", TokenKind::Return),
-            Expression::Identifier(Token::basic("abc", TokenKind::Identifier))
+            Factor::Identifier(Identifier(Token::basic("abc", TokenKind::Identifier))).to_expression()
         );
         assert!(actual.is_equivalent_to(&expected));
 
@@ -489,13 +695,13 @@ mod test {
         actual = setup(&src, 1).statements.into_iter().next().unwrap();
         expected = Statement::Return(
             Token::basic("return", TokenKind::Return),
-            Expression::FunctionCall(
+            Factor::FunctionCall(
                 Token::basic("add", TokenKind::Identifier),
                 vec![
-                    Expression::Integer(Token::basic("2", TokenKind::Integer), 2),
-                    Expression::Integer(Token::basic("3", TokenKind::Integer), 3),
+                    Factor::Integer(Token::basic("2", TokenKind::Integer), 2).to_expression(),
+                    Factor::Integer(Token::basic("3", TokenKind::Integer), 3).to_expression(),
                 ]
-            )
+            ).to_expression()
         );
         assert!(actual.is_equivalent_to(&expected));
     }
