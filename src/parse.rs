@@ -1,4 +1,5 @@
 use std::str::FromStr;
+use std::collections::HashSet;
 
 use crate::lex::{Token, TokenKind};
 
@@ -160,6 +161,33 @@ impl std::fmt::Display for ParseError {
             },
         };
         write!(f, "{}", msg)
+    }
+}
+
+impl ParseError {
+    #[allow(dead_code)]
+    fn is_equivalent_to(&self, other: &ParseError) -> bool {
+        match (self, other) {
+            (ParseError::UnexpectedToken(expected_l, found_l), ParseError::UnexpectedToken(expected_r, found_r)) => {
+                if !found_l.is_equivalent_to(found_r) {
+                    return false;
+                }
+
+                let hash_l: HashSet<_> = expected_l.iter().collect();
+                let hash_r: HashSet<_> = expected_r.iter().collect();
+                let diff: HashSet<_> = hash_l.symmetric_difference(&hash_r).collect();
+
+                diff.is_empty()
+            },
+            (ParseError::UnexpectedEndOfTokens, ParseError::UnexpectedEndOfTokens) => true,
+            (ParseError::IllegalToken(token_l), ParseError::IllegalToken(token_r)) => {
+                token_l.is_equivalent_to(token_r)
+            },
+            (ParseError::InvalidInteger(token_l), ParseError::InvalidInteger(token_r)) => {
+                token_l.is_equivalent_to(token_r)
+            },
+            _ => false,
+        }
     }
 }
 
@@ -334,7 +362,7 @@ mod test {
     use crate::lex::lex;
     use crate::lex::{Token, TokenKind};
     use crate::parse::parse;
-    use crate::parse::{Program, Statement, Expression};
+    use crate::parse::{Program, Statement, Expression, ParseError};
 
     fn setup(src: &str, expected_statement_count: usize) -> Program {
         let tokens = lex(&src);
@@ -418,6 +446,58 @@ mod test {
             )
         );
 
+        assert!(actual.is_equivalent_to(&expected));
+    }
+
+    #[test]
+    fn assign_missing_token() {
+        let mut src = "let abc = 123";
+        let mut tokens = lex(&src);
+        let mut parsed = parse(&tokens);
+
+        assert!(parsed.is_err());
+        let mut actual = parsed.err().unwrap();
+        let mut expected = ParseError::UnexpectedToken(
+            vec![TokenKind::Semicolon],
+            Token::basic("", TokenKind::EOF)
+        );
+        assert!(actual.is_equivalent_to(&expected));
+
+        src = "let abc 123;";
+        tokens = lex(&src);
+        parsed = parse(&tokens);
+
+        assert!(parsed.is_err());
+        actual = parsed.err().unwrap();
+        expected = ParseError::UnexpectedToken(
+            vec![TokenKind::Assign],
+            Token::basic("123", TokenKind::Integer)
+        );
+        assert!(actual.is_equivalent_to(&expected));
+
+        src = "let abc =;";
+        tokens = lex(&src);
+        parsed = parse(&tokens);
+
+        assert!(parsed.is_err());
+        actual = parsed.err().unwrap();
+        expected = ParseError::UnexpectedToken(
+            vec![TokenKind::Integer, TokenKind::Identifier],
+            Token::basic(";", TokenKind::Semicolon)
+        );
+        println!("{:?}", actual);
+        assert!(actual.is_equivalent_to(&expected));
+
+        src = "let = 123;";
+        tokens = lex(&src);
+        parsed = parse(&tokens);
+
+        assert!(parsed.is_err());
+        actual = parsed.err().unwrap();
+        expected = ParseError::UnexpectedToken(
+            vec![TokenKind::Identifier],
+            Token::basic("=", TokenKind::Assign)
+        );
         assert!(actual.is_equivalent_to(&expected));
     }
 

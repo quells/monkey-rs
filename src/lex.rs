@@ -1,4 +1,4 @@
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum TokenKind {
     // Meta
     Illegal,
@@ -42,7 +42,7 @@ pub enum TokenKind {
     False,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Token {
     pub literal: String,
     pub kind: TokenKind,
