@@ -3,10 +3,6 @@ use std::collections::HashSet;
 
 use crate::lex::{Token, TokenKind};
 
-pub trait Node {
-    fn token(&self) -> Option<Token>;
-}
-
 #[derive(Debug)]
 pub struct Program {
     pub statements: Vec<Statement>,
@@ -16,15 +12,6 @@ impl Program {
     fn new(statements: &[Statement]) -> Program {
         Program {
             statements: statements.to_vec(),
-        }
-    }
-}
-
-impl Node for Program {
-    fn token(&self) -> Option<Token> {
-        match (*self.statements).into_iter().next() {
-            Some(s) => s.token(),
-            None => None,
         }
     }
 }
@@ -47,16 +34,6 @@ impl Statement {
             },
             _ => false,
         }
-    }
-}
-
-impl Node for Statement {
-    fn token(&self) -> Option<Token> {
-        let t = match self {
-            Statement::Assignment(t, _, _) => t.clone(),
-            Statement::Return(t, _) => t.clone(),
-        };
-        Some(t)
     }
 }
 
@@ -100,17 +77,6 @@ impl Expression {
             }
             _ => false,
         }
-    }
-}
-
-impl Node for Expression {
-    fn token(&self) -> Option<Token> {
-        let t = match self {
-            Expression::Identifier(t) => t.clone(),
-            Expression::Integer(t, _) => t.clone(),
-            Expression::FunctionCall(t, _) => t.clone(),
-        };
-        Some(t)
     }
 }
 
