@@ -302,6 +302,7 @@ impl Parser {
 pub fn parse(tokens: &[Token]) -> Result<Program, ParseError> {
     let mut statements = Vec::new();
     let mut parser = Parser::new(&tokens);
+
     loop {
         let next_token = match parser.peek() {
             Some(t) => t,
@@ -320,7 +321,12 @@ pub fn parse(tokens: &[Token]) -> Result<Program, ParseError> {
         let statement = parser.next_statement()?;
         statements.push(statement);
     }
-    Ok(Program::new(&statements))
+
+    parser.eat(TokenKind::EOF)?;
+    match parser.peek() {
+        Some(t) => Err(ParseError::IllegalToken(t)),
+        None => Ok(Program::new(&statements)),
+    }
 }
 
 #[cfg(test)]
