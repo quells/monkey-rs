@@ -2,5 +2,6 @@ extern crate monkey;
 use monkey::repl;
 
 fn main() {
-    repl::parser(true)
+    let debug_enabled = true;
+    repl::parser(debug_enabled)
 }
