@@ -101,6 +101,34 @@ macro_rules! impl_display_binop {
     }
 }
 
+macro_rules! impl_next_binop {
+    ($fn:tt; $this:ident; $next:tt; $opkind:tt; $( $token:tt, $op:tt );+ ) => {
+        fn $fn(&mut self, first_token: Token) -> Result<$this, ParseError> {
+            let lhs = self.$next(first_token)?;
+
+            let op_token = match self.peek() {
+                Some(t) => t,
+                None => return Err(ParseError::UnexpectedEndOfTokens),
+            };
+            let op = match op_token.kind {
+                $(
+                    TokenKind::$token => $opkind::$op
+                ),*,
+                _ => return Ok($this::Wrapped(lhs)),
+            };
+            self.eat(op_token.kind)?;
+
+            let next_token = match self.peek() {
+                Some(t) => t,
+                None => return Err(ParseError::UnexpectedEndOfTokens),
+            };
+            let rhs = self.$next(next_token)?;
+
+            Ok($this::$this(lhs, op, rhs))
+        }
+    }
+}
+
 type Expression = Box<EqualityExpr>;
 
 #[derive(Clone, Debug)]
@@ -483,28 +511,10 @@ impl Parser {
         }
     }
 
-    fn next_term(&mut self, first_token: Token) -> Result<Term, ParseError> {
-        let lhs = self.next_factor(first_token)?;
-
-        let op_token = match self.peek() {
-            Some(t) => t,
-            None => return Err(ParseError::UnexpectedEndOfTokens),
-        };
-        let op = match op_token.kind {
-            TokenKind::Asterisk => TermBinOp::Multiply,
-            TokenKind::Slash => TermBinOp::Divide,
-            _ => return Ok(Term::Wrapped(lhs)),
-        };
-        self.eat(op_token.kind)?;
-
-        let next_token = match self.peek() {
-            Some(t) => t,
-            None => return Err(ParseError::UnexpectedEndOfTokens),
-        };
-        let rhs = self.next_factor(next_token)?;
-
-        Ok(Term::Term(lhs, op, rhs))
-    }
+    impl_next_binop!(next_term; Term; next_factor; TermBinOp;
+        Asterisk, Multiply;
+        Slash, Divide
+    );
 
     fn next_factor(&mut self, first_token: Token) -> Result<Factor, ParseError> {
         match first_token.kind {
