@@ -808,6 +808,26 @@ mod test {
     }
 
     #[test]
+    fn repeated_term() {
+        let mut src = "let a = 2 * 2 * 2;";
+        let mut actual = setup(&src, 1).statements.into_iter().next().unwrap();
+        let mut expected = Statement::Assignment(
+            Token::basic("let", TokenKind::Let),
+            Identifier(Token::basic("a", TokenKind::Identifier)),
+            Term::Term(
+                Factor::Integer(Token::basic("2", TokenKind::Integer), 2),
+                TermBinOp::Multiply,
+                Factor::Wrapped(Term::Term(
+                    Factor::Integer(Token::basic("2", TokenKind::Integer), 2),
+                    TermBinOp::Multiply,
+                    Factor::Integer(Token::basic("2", TokenKind::Integer), 2)
+                ).to_expression())
+            ).to_expression()
+        );
+        assert!(actual.is_equivalent_to(&expected));
+    }
+
+    #[test]
     fn addition() {
         let src = "let a = 2 + b;";
         let actual = setup(&src, 1).statements.into_iter().next().unwrap();
