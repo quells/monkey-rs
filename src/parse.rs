@@ -484,12 +484,26 @@ impl Parser {
     }
 
     fn next_term(&mut self, first_token: Token) -> Result<Term, ParseError> {
-        let lhs = self.next_factor(first_token);
-        // FIXME: check for term operator
-        match lhs {
-            Ok(expr) => Ok(Term::Wrapped(expr)),
-            Err(e) => Err(e),
-        }
+        let lhs = self.next_factor(first_token)?;
+
+        let op_token = match self.peek() {
+            Some(t) => t,
+            None => return Err(ParseError::UnexpectedEndOfTokens),
+        };
+        let op = match op_token.kind {
+            TokenKind::Asterisk => TermBinOp::Multiply,
+            TokenKind::Slash => TermBinOp::Divide,
+            _ => return Ok(Term::Wrapped(lhs)),
+        };
+        self.eat(op_token.kind)?;
+
+        let next_token = match self.peek() {
+            Some(t) => t,
+            None => return Err(ParseError::UnexpectedEndOfTokens),
+        };
+        let rhs = self.next_factor(next_token)?;
+
+        Ok(Term::Term(lhs, op, rhs))
     }
 
     fn next_factor(&mut self, first_token: Token) -> Result<Factor, ParseError> {
@@ -750,6 +764,38 @@ mod test {
                     Factor::Integer(Token::basic("2", TokenKind::Integer), 2).to_expression(),
                     Factor::Integer(Token::basic("3", TokenKind::Integer), 3).to_expression(),
                 ]
+            ).to_expression()
+        );
+        assert!(actual.is_equivalent_to(&expected));
+    }
+
+    #[test]
+    fn multiplication() {
+        let src = "let a = 2 * b;";
+        let actual = setup(&src, 1).statements.into_iter().next().unwrap();
+        let expected = Statement::Assignment(
+            Token::basic("let", TokenKind::Let),
+            Identifier(Token::basic("a", TokenKind::Identifier)),
+            Term::Term(
+                Factor::Integer(Token::basic("2", TokenKind::Integer), 2),
+                TermBinOp::Multiply,
+                Factor::Identifier(Identifier(Token::basic("b", TokenKind::Identifier)))
+            ).to_expression()
+        );
+        assert!(actual.is_equivalent_to(&expected));
+    }
+
+    #[test]
+    fn division() {
+        let src = "let a = b / 2;";
+        let actual = setup(&src, 1).statements.into_iter().next().unwrap();
+        let expected = Statement::Assignment(
+            Token::basic("let", TokenKind::Let),
+            Identifier(Token::basic("a", TokenKind::Identifier)),
+            Term::Term(
+                Factor::Identifier(Identifier(Token::basic("b", TokenKind::Identifier))),
+                TermBinOp::Divide,
+                Factor::Integer(Token::basic("2", TokenKind::Integer), 2)
             ).to_expression()
         );
         assert!(actual.is_equivalent_to(&expected));
