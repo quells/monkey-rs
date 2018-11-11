@@ -192,7 +192,7 @@ impl ToExpression for RelationalExpr {
 #[derive(Clone, Debug)]
 pub enum AdditiveExpr {
     Wrapped(Term),
-    Additive(Term, AdditiveBinOp, Term),
+    AdditiveExpr(Term, AdditiveBinOp, Term),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -201,8 +201,8 @@ pub enum AdditiveBinOp {
     Subtract,
 }
 
-impl_equivalent_to_binop!(AdditiveExpr, Additive, AdditiveBinOp);
-impl_display_binop_node!(AdditiveExpr, Additive);
+impl_equivalent_to_binop!(AdditiveExpr, AdditiveExpr, AdditiveBinOp);
+impl_display_binop_node!(AdditiveExpr, AdditiveExpr);
 impl_display_binop!(
     AdditiveBinOp;
     Add, "+";
@@ -502,14 +502,10 @@ impl Parser {
         }
     }
 
-    fn next_additive_expr(&mut self, first_token: Token) -> Result<AdditiveExpr, ParseError> {
-        let lhs = self.next_term(first_token);
-        // FIXME: check for additive operator
-        match lhs {
-            Ok(expr) => Ok(AdditiveExpr::Wrapped(expr)),
-            Err(e) => Err(e),
-        }
-    }
+    impl_next_binop!(next_additive_expr; AdditiveExpr; next_term; AdditiveBinOp;
+        Plus, Add;
+        Minus, Subtract
+    );
 
     impl_next_binop!(next_term; Term; next_factor; TermBinOp;
         Asterisk, Multiply;
@@ -806,6 +802,38 @@ mod test {
                 Factor::Identifier(Identifier(Token::basic("b", TokenKind::Identifier))),
                 TermBinOp::Divide,
                 Factor::Integer(Token::basic("2", TokenKind::Integer), 2)
+            ).to_expression()
+        );
+        assert!(actual.is_equivalent_to(&expected));
+    }
+
+    #[test]
+    fn addition() {
+        let src = "let a = 2 + b;";
+        let actual = setup(&src, 1).statements.into_iter().next().unwrap();
+        let expected = Statement::Assignment(
+            Token::basic("let", TokenKind::Let),
+            Identifier(Token::basic("a", TokenKind::Identifier)),
+            AdditiveExpr::AdditiveExpr(
+                Term::Wrapped(Factor::Integer(Token::basic("2", TokenKind::Integer), 2)),
+                AdditiveBinOp::Add,
+                Term::Wrapped(Factor::Identifier(Identifier(Token::basic("b", TokenKind::Identifier))))
+            ).to_expression()
+        );
+        assert!(actual.is_equivalent_to(&expected));
+    }
+
+    #[test]
+    fn subtraction() {
+        let src = "let a = 2 - b;";
+        let actual = setup(&src, 1).statements.into_iter().next().unwrap();
+        let expected = Statement::Assignment(
+            Token::basic("let", TokenKind::Let),
+            Identifier(Token::basic("a", TokenKind::Identifier)),
+            AdditiveExpr::AdditiveExpr(
+                Term::Wrapped(Factor::Integer(Token::basic("2", TokenKind::Integer), 2)),
+                AdditiveBinOp::Subtract,
+                Term::Wrapped(Factor::Identifier(Identifier(Token::basic("b", TokenKind::Identifier))))
             ).to_expression()
         );
         assert!(actual.is_equivalent_to(&expected));
