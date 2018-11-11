@@ -450,6 +450,49 @@ impl Parser {
             }
         };
 
+        match self.next_equality_expr(first_token) {
+            Ok(expr) => Ok(Box::new(expr)),
+            Err(e) => Err(e),
+        }
+    }
+
+    fn next_equality_expr(&mut self, first_token: Token) -> Result<EqualityExpr, ParseError> {
+        let lhs = self.next_relational_expr(first_token);
+        // FIXME: check for equality operator
+        match lhs {
+            Ok(expr) => Ok(EqualityExpr::Wrapped(expr)),
+            Err(e) => Err(e),
+        }
+    }
+
+    fn next_relational_expr(&mut self, first_token: Token) -> Result<RelationalExpr, ParseError> {
+        let lhs = self.next_additive_expr(first_token);
+        // FIXME: check for relational operator
+        match lhs {
+            Ok(expr) => Ok(RelationalExpr::Wrapped(expr)),
+            Err(e) => Err(e),
+        }
+    }
+
+    fn next_additive_expr(&mut self, first_token: Token) -> Result<AdditiveExpr, ParseError> {
+        let lhs = self.next_term(first_token);
+        // FIXME: check for additive operator
+        match lhs {
+            Ok(expr) => Ok(AdditiveExpr::Wrapped(expr)),
+            Err(e) => Err(e),
+        }
+    }
+
+    fn next_term(&mut self, first_token: Token) -> Result<Term, ParseError> {
+        let lhs = self.next_factor(first_token);
+        // FIXME: check for term operator
+        match lhs {
+            Ok(expr) => Ok(Term::Wrapped(expr)),
+            Err(e) => Err(e),
+        }
+    }
+
+    fn next_factor(&mut self, first_token: Token) -> Result<Factor, ParseError> {
         match first_token.kind {
             TokenKind::Integer => {
                 let int = self.eat(TokenKind::Integer)?;
@@ -457,43 +500,50 @@ impl Parser {
                     Ok(x) => x,
                     Err(_) => return Err(ParseError::InvalidInteger(int)),
                 };
-                Ok(Factor::Integer(int, parsed).to_expression())
+                Ok(Factor::Integer(int, parsed))
             },
             TokenKind::Identifier => {
                 let id = self.eat(TokenKind::Identifier)?;
-                let default = Ok(Factor::Identifier(Identifier(id.clone())).to_expression());
+                let default = Factor::Identifier(Identifier(id.clone()));
                 let next_token = match self.peek() {
                     Some(t) => t,
-                    None => return default,
+                    None => return Ok(default),
                 };
                 match next_token.kind {
                     TokenKind::LParen => {
                         self.eat(TokenKind::LParen)?;
                         let mut params = Vec::new();
                         loop {
-                            let maybe_close = match self.peek() {
-                                Some(t) => t,
-                                None => return Err(ParseError::UnexpectedEndOfTokens),
+                            // Exit loop on `)` or EOF
+                            let eof = Err(ParseError::UnexpectedEndOfTokens);
+                            match self.peek() {
+                                Some(t) => {
+                                    match t.kind {
+                                        TokenKind::RParen => {
+                                            self.eat(TokenKind::RParen)?;
+                                            break;
+                                        },
+                                        TokenKind::EOF => return eof,
+                                        _ => (),
+                                    }
+                                },
+                                None => return eof,
                             };
-                            if maybe_close.kind == TokenKind::RParen {
-                                self.eat(TokenKind::RParen)?;
-                                break;
-                            }
 
-                            if params.len() > 0 {
+                            if !params.is_empty() {
                                 self.eat(TokenKind::Comma)?;
                             }
-                            let expr = self.next_expression()?;
-                            params.push(expr);
+                            params.push(self.next_expression()?);
                         }
-                        Ok(Factor::FunctionCall(id, params).to_expression())
+                        Ok(Factor::FunctionCall(id, params))
                     },
-                    _ => default,
+                    _ => Ok(default),
                 }
             },
-            _ => {
-                return Err(ParseError::UnexpectedToken(vec![TokenKind::Integer, TokenKind::Identifier], first_token));
-            }
+            _ => Err(ParseError::UnexpectedToken(
+                vec![TokenKind::Integer, TokenKind::Identifier],
+                first_token
+            )),
         }
     }
 }
@@ -533,8 +583,7 @@ mod test {
     use crate::lex::lex;
     use crate::lex::{Token, TokenKind};
     use crate::parse::parse;
-    use crate::parse::{Program, Statement, Factor, Identifier, ParseError};
-    use crate::parse::{ToExpression, EquivalentTo};
+    use crate::parse::*;
 
     fn setup(src: &str, expected_statement_count: usize) -> Program {
         let tokens = lex(&src);
