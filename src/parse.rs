@@ -11,6 +11,14 @@ pub trait ToExpression {
     fn to_expression(&self) -> Expression;
 }
 
+pub trait ToChild<T> {
+    fn to_child(&self) -> T;
+}
+
+pub trait AsParent<T> {
+    fn as_parent(&self) -> Option<T>;
+}
+
 #[derive(Debug)]
 pub struct Program {
     pub statements: Vec<Statement>,
@@ -59,15 +67,26 @@ impl std::fmt::Display for Statement {
 }
 
 macro_rules! impl_equivalent_to_binop {
-    ($this:ident, $child:ident, $binop: ident) => {
+    ($this:ident) => {
         impl EquivalentTo for $this {
             fn is_equivalent_to(&self, other: &Self) -> bool {
                 match (self, other) {
                     ($this::Wrapped(l), $this::Wrapped(r)) => l.is_equivalent_to(r),
-                    ($this::$child(ll, lop, lr), $this::$child(rl, rop, rr)) => {
+                    ($this::$this(ll, lop, lr), $this::$this(rl, rop, rr)) => {
                         lop == rop && ll.is_equivalent_to(rl) && lr.is_equivalent_to(rr)
                     },
-                    _ => false,
+                    ($this::Wrapped(l), $this::$this(_, _, _)) => {
+                        match l.as_parent() {
+                            Some(l) => l.is_equivalent_to(other),
+                            None => false,
+                        }
+                    },
+                    ($this::$this(_, _, _), $this::Wrapped(r)) => {
+                        match r.as_parent() {
+                            Some(r) => r.is_equivalent_to(self),
+                            None => false,
+                        }
+                    },
                 }
             }
         }
@@ -104,27 +123,41 @@ macro_rules! impl_display_binop {
 macro_rules! impl_next_binop {
     ($fn:tt; $this:ident; $next:tt; $opkind:tt; $( $token:tt, $op:tt );+ ) => {
         fn $fn(&mut self, first_token: Token) -> Result<$this, ParseError> {
-            let lhs = self.$next(first_token)?;
+            // left associative
+            let mut lhs = self.$next(first_token)?;
 
-            let op_token = match self.peek() {
-                Some(t) => t,
-                None => return Err(ParseError::UnexpectedEndOfTokens),
-            };
-            let op = match op_token.kind {
-                $(
-                    TokenKind::$token => $opkind::$op
-                ),*,
-                _ => return Ok($this::Wrapped(lhs)),
-            };
-            self.eat(op_token.kind)?;
+            loop {
+                let op_token = match self.peek() {
+                    Some(t) => t,
+                    None => return Err(ParseError::UnexpectedEndOfTokens),
+                };
+                let op = match op_token.kind {
+                    $(
+                        TokenKind::$token => $opkind::$op
+                    ),*,
+                    _ => break,
+                };
+                self.eat(op_token.kind)?;
 
-            let next_token = match self.peek() {
-                Some(t) => t,
-                None => return Err(ParseError::UnexpectedEndOfTokens),
-            };
-            let rhs = self.$next(next_token)?;
+                let next_token = match self.peek() {
+                    Some(t) => t,
+                    None => return Err(ParseError::UnexpectedEndOfTokens),
+                };
+                let rhs = self.$next(next_token)?;
 
-            Ok($this::$this(lhs, op, rhs))
+                lhs = $this::$this(lhs.clone(), op, rhs).to_child();
+            }
+
+            Ok($this::Wrapped(lhs))
+        }
+    }
+}
+
+macro_rules! wrapped_or_return_none {
+    ($matcher:tt, $this:ident) => {
+        match $matcher {
+            $this::Wrapped(w) => w,
+            _ => return None,
         }
     }
 }
@@ -134,7 +167,7 @@ type Expression = Box<EqualityExpr>;
 #[derive(Clone, Debug)]
 pub enum EqualityExpr {
     Wrapped(RelationalExpr),
-    Equality(RelationalExpr, EqualityBinOp, RelationalExpr),
+    EqualityExpr(RelationalExpr, EqualityBinOp, RelationalExpr),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -143,13 +176,26 @@ pub enum EqualityBinOp {
     NotEqual,
 }
 
-impl_equivalent_to_binop!(EqualityExpr, Equality, EqualityBinOp);
-impl_display_binop_node!(EqualityExpr, Equality);
+impl_equivalent_to_binop!(EqualityExpr);
+impl_display_binop_node!(EqualityExpr, EqualityExpr);
 impl_display_binop!(
     EqualityBinOp;
     Equal, "==";
     NotEqual, "!="
 );
+
+impl AsParent<Factor> for EqualityExpr {
+    fn as_parent(&self) -> Option<Factor> {
+        let relational = wrapped_or_return_none!(self, EqualityExpr);
+        let additive = wrapped_or_return_none!(relational, RelationalExpr);
+        let term = wrapped_or_return_none!(additive, AdditiveExpr);
+        let factor = wrapped_or_return_none!(term, Term);
+        match factor {
+            Factor::Wrapped(e) => e.as_parent(),
+            _ => Some(factor.clone()),
+        }
+    }
+}
 
 impl ToExpression for EqualityExpr {
     fn to_expression(&self) -> Expression {
@@ -157,10 +203,21 @@ impl ToExpression for EqualityExpr {
     }
 }
 
+impl ToChild<RelationalExpr> for EqualityExpr {
+    fn to_child(&self) -> RelationalExpr {
+        RelationalExpr::Wrapped(
+            AdditiveExpr::Wrapped(
+                Term::Wrapped(
+                    Factor::Wrapped(
+                        self.to_expression()
+        ))))
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum RelationalExpr {
     Wrapped(AdditiveExpr),
-    Relational(AdditiveExpr, RelationalBinOp, AdditiveExpr),
+    RelationalExpr(AdditiveExpr, RelationalBinOp, AdditiveExpr),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -171,8 +228,8 @@ pub enum RelationalBinOp {
     GreaterThan,
 }
 
-impl_equivalent_to_binop!(RelationalExpr, Relational, RelationalBinOp);
-impl_display_binop_node!(RelationalExpr, Relational);
+impl_equivalent_to_binop!(RelationalExpr);
+impl_display_binop_node!(RelationalExpr, RelationalExpr);
 impl_display_binop!(
     RelationalBinOp; 
     LessThan, "<";
@@ -181,11 +238,32 @@ impl_display_binop!(
     GreaterThanEqual, ">="
 );
 
+impl AsParent<EqualityExpr> for RelationalExpr {
+    fn as_parent(&self) -> Option<EqualityExpr> {
+        let additive = wrapped_or_return_none!(self, RelationalExpr);
+        let term = wrapped_or_return_none!(additive, AdditiveExpr);
+        let factor = wrapped_or_return_none!(term, Term);
+        let equality = wrapped_or_return_none!(factor, Factor);
+        let unboxed = *(*equality).clone();
+        Some(unboxed)
+    }
+}
+
 impl ToExpression for RelationalExpr {
     fn to_expression(&self) -> Expression {
         Box::new(
             EqualityExpr::Wrapped(self.clone())
         )
+    }
+}
+
+impl ToChild<AdditiveExpr> for RelationalExpr {
+    fn to_child(&self) -> AdditiveExpr {
+        AdditiveExpr::Wrapped(
+            Term::Wrapped(
+                Factor::Wrapped(
+                    self.to_expression()
+        )))
     }
 }
 
@@ -201,7 +279,7 @@ pub enum AdditiveBinOp {
     Subtract,
 }
 
-impl_equivalent_to_binop!(AdditiveExpr, AdditiveExpr, AdditiveBinOp);
+impl_equivalent_to_binop!(AdditiveExpr);
 impl_display_binop_node!(AdditiveExpr, AdditiveExpr);
 impl_display_binop!(
     AdditiveBinOp;
@@ -209,11 +287,31 @@ impl_display_binop!(
     Subtract, "-"
 );
 
+impl AsParent<RelationalExpr> for AdditiveExpr {
+    fn as_parent(&self) -> Option<RelationalExpr> {
+        let term = wrapped_or_return_none!(self, AdditiveExpr);
+        let factor = wrapped_or_return_none!(term, Term);
+        let equality = wrapped_or_return_none!(factor, Factor);
+        let unboxed = *(*equality).clone();
+        let relational = wrapped_or_return_none!(unboxed, EqualityExpr);
+        Some(relational)
+    }
+}
+
 impl ToExpression for AdditiveExpr {
     fn to_expression(&self) -> Expression {
         Box::new(
             EqualityExpr::Wrapped(
                 RelationalExpr::Wrapped(self.clone())
+        ))
+    }
+}
+
+impl ToChild<Term> for AdditiveExpr {
+    fn to_child(&self) -> Term {
+        Term::Wrapped(
+            Factor::Wrapped(
+                self.to_expression()
         ))
     }
 }
@@ -230,13 +328,24 @@ pub enum TermBinOp {
     Divide,
 }
 
-impl_equivalent_to_binop!(Term, Term, TermBinOp);
+impl_equivalent_to_binop!(Term);
 impl_display_binop_node!(Term, Term);
 impl_display_binop!(
     TermBinOp;
     Multiply, "*";
     Divide, "/"
 );
+
+impl AsParent<AdditiveExpr> for Term {
+    fn as_parent(&self) -> Option<AdditiveExpr> {
+        let factor = wrapped_or_return_none!(self, Term);
+        let equality = wrapped_or_return_none!(factor, Factor);
+        let unboxed = *(*equality).clone();
+        let relational = wrapped_or_return_none!(unboxed, EqualityExpr);
+        let additive = wrapped_or_return_none!(relational, RelationalExpr);
+        Some(additive)
+    }
+}
 
 impl ToExpression for Term {
     fn to_expression(&self) -> Expression {
@@ -248,12 +357,29 @@ impl ToExpression for Term {
     }
 }
 
+impl ToChild<Factor> for Term {
+    fn to_child(&self) -> Factor {
+        Factor::Wrapped(self.to_expression())
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum Factor {
     Wrapped(Expression),
     Identifier(Identifier),
     Integer(Token, isize),
     FunctionCall(Token, Vec<Expression>),
+}
+
+impl AsParent<Term> for Factor {
+    fn as_parent(&self) -> Option<Term> {
+        let equality = wrapped_or_return_none!(self, Factor);
+        let unboxed = *(*equality).clone();
+        let relational = wrapped_or_return_none!(unboxed, EqualityExpr);
+        let additive = wrapped_or_return_none!(relational, RelationalExpr);
+        let term = wrapped_or_return_none!(additive, AdditiveExpr);
+        Some(term)
+    }
 }
 
 impl EquivalentTo for Factor {
@@ -273,6 +399,18 @@ impl EquivalentTo for Factor {
                     .map(|(l, r)| l.is_equivalent_to(r))
                     .fold(true, |a, b| a && b);
                 id_l.is_equivalent_to(id_r) && param_acc
+            },
+            (Factor::Wrapped(l), _) => {
+                match l.as_parent() {
+                    Some(l) => l.is_equivalent_to(other),
+                    None => false,
+                }
+            },
+            (_, Factor::Wrapped(r)) => {
+                match r.as_parent() {
+                    Some(r) => r.is_equivalent_to(self),
+                    None => false,
+                }
             }
             _ => false,
         }
@@ -815,13 +953,13 @@ mod test {
             Token::basic("let", TokenKind::Let),
             Identifier(Token::basic("a", TokenKind::Identifier)),
             Term::Term(
-                Factor::Integer(Token::basic("2", TokenKind::Integer), 2),
-                TermBinOp::Multiply,
                 Factor::Wrapped(Term::Term(
                     Factor::Integer(Token::basic("2", TokenKind::Integer), 2),
                     TermBinOp::Multiply,
                     Factor::Integer(Token::basic("2", TokenKind::Integer), 2)
-                ).to_expression())
+                ).to_expression()),
+                TermBinOp::Multiply,
+                Factor::Integer(Token::basic("2", TokenKind::Integer), 2)
             ).to_expression()
         );
         assert!(actual.is_equivalent_to(&expected));
