@@ -1,3 +1,5 @@
+extern crate time;
+
 use std::io::{self, Write};
 
 fn read_line(prompt: Option<String>) -> io::Result<String> {
@@ -41,8 +43,15 @@ pub fn parser(debug: bool) {
                 return;
             }
         };
+
+        let mut lex_time = time::precise_time_ns();
         let tokens = lex(&input);
+        lex_time = time::precise_time_ns() - lex_time;
+        
+        let mut parse_time = time::precise_time_ns();
         let program = parse(&tokens);
+        parse_time = time::precise_time_ns() - parse_time;
+
         match program {
             Ok(program) => {
                 if debug {
@@ -59,5 +68,29 @@ pub fn parser(debug: bool) {
                 eprintln!("{}", e);
             }
         }
+
+        if debug {
+            println!("{} to lex", human_time(lex_time));
+            println!("{} to parse", human_time(parse_time));
+        }
     }
+}
+
+fn human_time(t: u64) -> String {
+    if t < 1000 {
+        return format!("{} ns", t);
+    }
+
+    let t = t / 1000;
+    if t < 1000 {
+        return format!("{} us", t);
+    }
+
+    let t = t / 1000;
+    if t < 1000 {
+        return format!("{} ms", t);
+    }
+
+    let t = t / 1000;
+    return format!("{} s", t);
 }
