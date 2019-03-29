@@ -142,7 +142,7 @@ macro_rules! impl_next_binop {
                 };
                 let rhs = self.$next(next_token)?;
 
-                lhs = $this::$this(lhs.clone(), op, rhs).to_child();
+                lhs = $this::$this(Box::new(lhs.clone()), op, Box::new(rhs)).to_child();
             }
 
             Ok($this::Wrapped(lhs))
@@ -164,7 +164,7 @@ type Expression = Box<EqualityExpr>;
 #[derive(Clone, Debug)]
 pub enum EqualityExpr {
     Wrapped(RelationalExpr),
-    EqualityExpr(RelationalExpr, EqualityBinOp, RelationalExpr),
+    EqualityExpr(Box<RelationalExpr>, EqualityBinOp, Box<RelationalExpr>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -211,7 +211,7 @@ impl ToChild<RelationalExpr> for EqualityExpr {
 #[derive(Clone, Debug)]
 pub enum RelationalExpr {
     Wrapped(AdditiveExpr),
-    RelationalExpr(AdditiveExpr, RelationalBinOp, AdditiveExpr),
+    RelationalExpr(Box<AdditiveExpr>, RelationalBinOp, Box<AdditiveExpr>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -258,7 +258,7 @@ impl ToChild<AdditiveExpr> for RelationalExpr {
 #[derive(Clone, Debug)]
 pub enum AdditiveExpr {
     Wrapped(Term),
-    AdditiveExpr(Term, AdditiveBinOp, Term),
+    AdditiveExpr(Box<Term>, AdditiveBinOp, Box<Term>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -301,7 +301,7 @@ impl ToChild<Term> for AdditiveExpr {
 #[derive(Clone, Debug)]
 pub enum Term {
     Wrapped(Factor),
-    Term(Factor, TermBinOp, Factor),
+    Term(Box<Factor>, TermBinOp, Box<Factor>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -901,9 +901,12 @@ mod test {
             Token::basic("let", TokenKind::Let),
             Identifier(Token::basic("a", TokenKind::Identifier)),
             Term::Term(
-                Factor::Integer(Token::basic("2", TokenKind::Integer), 2),
+                Box::new(Factor::Integer(Token::basic("2", TokenKind::Integer), 2)),
                 TermBinOp::Multiply,
-                Factor::Identifier(Identifier(Token::basic("b", TokenKind::Identifier))),
+                Box::new(Factor::Identifier(Identifier(Token::basic(
+                    "b",
+                    TokenKind::Identifier,
+                )))),
             )
             .to_expression(),
         );
@@ -918,9 +921,12 @@ mod test {
             Token::basic("let", TokenKind::Let),
             Identifier(Token::basic("a", TokenKind::Identifier)),
             Term::Term(
-                Factor::Identifier(Identifier(Token::basic("b", TokenKind::Identifier))),
+                Box::new(Factor::Identifier(Identifier(Token::basic(
+                    "b",
+                    TokenKind::Identifier,
+                )))),
                 TermBinOp::Divide,
-                Factor::Integer(Token::basic("2", TokenKind::Integer), 2),
+                Box::new(Factor::Integer(Token::basic("2", TokenKind::Integer), 2)),
             )
             .to_expression(),
         );
@@ -929,22 +935,22 @@ mod test {
 
     #[test]
     fn repeated_term() {
-        let mut src = "let a = 2 * 2 * 2;";
-        let mut actual = setup(&src, 1).statements.into_iter().next().unwrap();
-        let mut expected = Statement::Assignment(
+        let src = "let a = 2 * 2 * 2;";
+        let actual = setup(&src, 1).statements.into_iter().next().unwrap();
+        let expected = Statement::Assignment(
             Token::basic("let", TokenKind::Let),
             Identifier(Token::basic("a", TokenKind::Identifier)),
             Term::Term(
-                Factor::Wrapped(
+                Box::new(Factor::Wrapped(
                     Term::Term(
-                        Factor::Integer(Token::basic("2", TokenKind::Integer), 2),
+                        Box::new(Factor::Integer(Token::basic("2", TokenKind::Integer), 2)),
                         TermBinOp::Multiply,
-                        Factor::Integer(Token::basic("2", TokenKind::Integer), 2),
+                        Box::new(Factor::Integer(Token::basic("2", TokenKind::Integer), 2)),
                     )
                     .to_expression(),
-                ),
+                )),
                 TermBinOp::Multiply,
-                Factor::Integer(Token::basic("2", TokenKind::Integer), 2),
+                Box::new(Factor::Integer(Token::basic("2", TokenKind::Integer), 2)),
             )
             .to_expression(),
         );
@@ -959,12 +965,15 @@ mod test {
             Token::basic("let", TokenKind::Let),
             Identifier(Token::basic("a", TokenKind::Identifier)),
             AdditiveExpr::AdditiveExpr(
-                Term::Wrapped(Factor::Integer(Token::basic("2", TokenKind::Integer), 2)),
+                Box::new(Term::Wrapped(Factor::Integer(
+                    Token::basic("2", TokenKind::Integer),
+                    2,
+                ))),
                 AdditiveBinOp::Add,
-                Term::Wrapped(Factor::Identifier(Identifier(Token::basic(
+                Box::new(Term::Wrapped(Factor::Identifier(Identifier(Token::basic(
                     "b",
                     TokenKind::Identifier,
-                )))),
+                ))))),
             )
             .to_expression(),
         );
@@ -979,12 +988,15 @@ mod test {
             Token::basic("let", TokenKind::Let),
             Identifier(Token::basic("a", TokenKind::Identifier)),
             AdditiveExpr::AdditiveExpr(
-                Term::Wrapped(Factor::Integer(Token::basic("2", TokenKind::Integer), 2)),
+                Box::new(Term::Wrapped(Factor::Integer(
+                    Token::basic("2", TokenKind::Integer),
+                    2,
+                ))),
                 AdditiveBinOp::Subtract,
-                Term::Wrapped(Factor::Identifier(Identifier(Token::basic(
+                Box::new(Term::Wrapped(Factor::Identifier(Identifier(Token::basic(
                     "b",
                     TokenKind::Identifier,
-                )))),
+                ))))),
             )
             .to_expression(),
         );
