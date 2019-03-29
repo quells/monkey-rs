@@ -375,10 +375,10 @@ impl EquivalentTo for Factor {
                     return false;
                 }
                 let param_acc = params_l
-                    .into_iter()
+                    .iter()
                     .zip(params_r)
                     .map(|(l, r)| l.is_equivalent_to(r))
-                    .fold(true, |a, b| a && b);
+                    .all(|b| b);
                 id_l.is_equivalent_to(id_r) && param_acc
             }
             (Factor::Wrapped(l), _) => match l.as_parent() {
@@ -420,7 +420,7 @@ impl std::fmt::Display for Factor {
             Factor::FunctionCall(id, params) => {
                 let param_strs = match params.split_first() {
                     Some((first, rest)) => rest
-                        .into_iter()
+                        .iter()
                         .fold(format!("{}", first), |a, b| format!("{}, {}", a, b)),
                     None => "".to_owned(),
                 };
@@ -682,12 +682,7 @@ pub fn parse(tokens: &[Token]) -> Result<Program, ParseError> {
     let mut statements = Vec::new();
     let mut parser = Parser::new(&tokens);
 
-    loop {
-        let next_token = match parser.peek() {
-            Some(t) => t,
-            None => break,
-        };
-
+    while let Some(next_token) = parser.peek() {
         match next_token.kind {
             TokenKind::EOF => break,
             TokenKind::Semicolon => {
