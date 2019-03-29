@@ -55,7 +55,7 @@ pub fn parser(debug: bool) {
                         println!("{}", s);
                     }
                 }
-            },
+            }
             Err(e) => {
                 eprintln!("{}", e);
             }

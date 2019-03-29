@@ -1,5 +1,5 @@
-use std::str::FromStr;
 use std::collections::HashSet;
+use std::str::FromStr;
 
 use crate::lex::{Token, TokenKind};
 
@@ -35,18 +35,23 @@ impl Program {
 #[derive(Clone, Debug)]
 pub enum Statement {
     Assignment(Token, Identifier, Expression), // let `a` = `b`;
-    Return(Token, Expression), // return `a`;
+    Return(Token, Expression),                 // return `a`;
 }
 
 impl EquivalentTo for Statement {
     fn is_equivalent_to(&self, other: &Statement) -> bool {
         match (self, other) {
-            (Statement::Assignment(let_l, id_l, expr_l), Statement::Assignment(let_r, id_r, expr_r)) => {
-                let_l.is_equivalent_to(let_r) && id_l.is_equivalent_to(id_r) && expr_l.is_equivalent_to(expr_r)
-            },
+            (
+                Statement::Assignment(let_l, id_l, expr_l),
+                Statement::Assignment(let_r, id_r, expr_r),
+            ) => {
+                let_l.is_equivalent_to(let_r)
+                    && id_l.is_equivalent_to(id_r)
+                    && expr_l.is_equivalent_to(expr_r)
+            }
             (Statement::Return(return_l, value_l), Statement::Return(return_r, value_r)) => {
                 return_l.is_equivalent_to(return_r) && value_l.is_equivalent_to(value_r)
-            },
+            }
             _ => false,
         }
     }
@@ -55,12 +60,8 @@ impl EquivalentTo for Statement {
 impl std::fmt::Display for Statement {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let msg = match self {
-            Statement::Assignment(_, id, value) => {
-                format!("let {} = {};", id, value)
-            },
-            Statement::Return(_, value) => {
-                format!("return {};", value)
-            }
+            Statement::Assignment(_, id, value) => format!("let {} = {};", id, value),
+            Statement::Return(_, value) => format!("return {};", value),
         };
         write!(f, "{}", msg)
     }
@@ -74,23 +75,19 @@ macro_rules! impl_equivalent_to_binop {
                     ($this::Wrapped(l), $this::Wrapped(r)) => l.is_equivalent_to(r),
                     ($this::$this(ll, lop, lr), $this::$this(rl, rop, rr)) => {
                         lop == rop && ll.is_equivalent_to(rl) && lr.is_equivalent_to(rr)
+                    }
+                    ($this::Wrapped(l), $this::$this(_, _, _)) => match l.as_parent() {
+                        Some(l) => l.is_equivalent_to(other),
+                        None => false,
                     },
-                    ($this::Wrapped(l), $this::$this(_, _, _)) => {
-                        match l.as_parent() {
-                            Some(l) => l.is_equivalent_to(other),
-                            None => false,
-                        }
-                    },
-                    ($this::$this(_, _, _), $this::Wrapped(r)) => {
-                        match r.as_parent() {
-                            Some(r) => r.is_equivalent_to(self),
-                            None => false,
-                        }
+                    ($this::$this(_, _, _), $this::Wrapped(r)) => match r.as_parent() {
+                        Some(r) => r.is_equivalent_to(self),
+                        None => false,
                     },
                 }
             }
         }
-    }
+    };
 }
 
 macro_rules! impl_display_binop_node {
@@ -103,7 +100,7 @@ macro_rules! impl_display_binop_node {
                 }
             }
         }
-    }
+    };
 }
 
 macro_rules! impl_display_binop {
@@ -159,7 +156,7 @@ macro_rules! wrapped_or_return_none {
             $this::Wrapped(w) => w,
             _ => return None,
         }
-    }
+    };
 }
 
 type Expression = Box<EqualityExpr>;
@@ -205,11 +202,8 @@ impl ToExpression for EqualityExpr {
 
 impl ToChild<RelationalExpr> for EqualityExpr {
     fn to_child(&self) -> RelationalExpr {
-        RelationalExpr::Wrapped(
-            AdditiveExpr::Wrapped(
-                Term::Wrapped(
-                    Factor::Wrapped(
-                        self.to_expression()
+        RelationalExpr::Wrapped(AdditiveExpr::Wrapped(Term::Wrapped(Factor::Wrapped(
+            self.to_expression(),
         ))))
     }
 }
@@ -231,7 +225,7 @@ pub enum RelationalBinOp {
 impl_equivalent_to_binop!(RelationalExpr);
 impl_display_binop_node!(RelationalExpr, RelationalExpr);
 impl_display_binop!(
-    RelationalBinOp; 
+    RelationalBinOp;
     LessThan, "<";
     LessThanEqual, "<=";
     GreaterThan, ">";
@@ -251,19 +245,13 @@ impl AsParent<EqualityExpr> for RelationalExpr {
 
 impl ToExpression for RelationalExpr {
     fn to_expression(&self) -> Expression {
-        Box::new(
-            EqualityExpr::Wrapped(self.clone())
-        )
+        Box::new(EqualityExpr::Wrapped(self.clone()))
     }
 }
 
 impl ToChild<AdditiveExpr> for RelationalExpr {
     fn to_child(&self) -> AdditiveExpr {
-        AdditiveExpr::Wrapped(
-            Term::Wrapped(
-                Factor::Wrapped(
-                    self.to_expression()
-        )))
+        AdditiveExpr::Wrapped(Term::Wrapped(Factor::Wrapped(self.to_expression())))
     }
 }
 
@@ -300,19 +288,13 @@ impl AsParent<RelationalExpr> for AdditiveExpr {
 
 impl ToExpression for AdditiveExpr {
     fn to_expression(&self) -> Expression {
-        Box::new(
-            EqualityExpr::Wrapped(
-                RelationalExpr::Wrapped(self.clone())
-        ))
+        Box::new(EqualityExpr::Wrapped(RelationalExpr::Wrapped(self.clone())))
     }
 }
 
 impl ToChild<Term> for AdditiveExpr {
     fn to_child(&self) -> Term {
-        Term::Wrapped(
-            Factor::Wrapped(
-                self.to_expression()
-        ))
+        Term::Wrapped(Factor::Wrapped(self.to_expression()))
     }
 }
 
@@ -349,10 +331,8 @@ impl AsParent<AdditiveExpr> for Term {
 
 impl ToExpression for Term {
     fn to_expression(&self) -> Expression {
-        Box::new(
-            EqualityExpr::Wrapped(
-                RelationalExpr::Wrapped(
-                    AdditiveExpr::Wrapped(self.clone())
+        Box::new(EqualityExpr::Wrapped(RelationalExpr::Wrapped(
+            AdditiveExpr::Wrapped(self.clone()),
         )))
     }
 }
@@ -389,29 +369,26 @@ impl EquivalentTo for Factor {
             (Factor::Identifier(l), Factor::Identifier(r)) => l.is_equivalent_to(r),
             (Factor::Integer(literal_l, parsed_l), Factor::Integer(literal_r, parsed_r)) => {
                 literal_l.is_equivalent_to(literal_r) && parsed_l == parsed_r
-            },
+            }
             (Factor::FunctionCall(id_l, params_l), Factor::FunctionCall(id_r, params_r)) => {
                 if params_l.len() != params_r.len() {
                     return false;
                 }
-                let param_acc = params_l.into_iter()
+                let param_acc = params_l
+                    .into_iter()
                     .zip(params_r)
                     .map(|(l, r)| l.is_equivalent_to(r))
                     .fold(true, |a, b| a && b);
                 id_l.is_equivalent_to(id_r) && param_acc
-            },
-            (Factor::Wrapped(l), _) => {
-                match l.as_parent() {
-                    Some(l) => l.is_equivalent_to(other),
-                    None => false,
-                }
-            },
-            (_, Factor::Wrapped(r)) => {
-                match r.as_parent() {
-                    Some(r) => r.is_equivalent_to(self),
-                    None => false,
-                }
             }
+            (Factor::Wrapped(l), _) => match l.as_parent() {
+                Some(l) => l.is_equivalent_to(other),
+                None => false,
+            },
+            (_, Factor::Wrapped(r)) => match r.as_parent() {
+                Some(r) => r.is_equivalent_to(self),
+                None => false,
+            },
             _ => false,
         }
     }
@@ -419,12 +396,11 @@ impl EquivalentTo for Factor {
 
 impl ToExpression for Factor {
     fn to_expression(&self) -> Expression {
-        let wrapped = |v: &Self| Box::new(
-            EqualityExpr::Wrapped(
-                RelationalExpr::Wrapped(
-                    AdditiveExpr::Wrapped(
-                        Term::Wrapped(v.clone())
-        ))));
+        let wrapped = |v: &Self| {
+            Box::new(EqualityExpr::Wrapped(RelationalExpr::Wrapped(
+                AdditiveExpr::Wrapped(Term::Wrapped(v.clone())),
+            )))
+        };
 
         match self {
             Factor::Wrapped(e) => e.clone(),
@@ -443,14 +419,13 @@ impl std::fmt::Display for Factor {
             Factor::Integer(t, _) => t.literal.clone(),
             Factor::FunctionCall(id, params) => {
                 let param_strs = match params.split_first() {
-                    Some((first, rest)) => {
-                        rest.into_iter()
-                            .fold(format!("{}", first), |a, b| format!("{}, {}", a, b))
-                    },
+                    Some((first, rest)) => rest
+                        .into_iter()
+                        .fold(format!("{}", first), |a, b| format!("{}, {}", a, b)),
                     None => "".to_owned(),
                 };
                 format!("{}({})", id.literal, param_strs)
-            },
+            }
         };
         write!(f, "{}", msg)
     }
@@ -486,16 +461,13 @@ impl Error for ParseError {}
 impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let msg = match self {
-            ParseError::UnexpectedToken(e, t) => {
-                format!("unexpected token at {}:{} : expected one of {:?} found {:?}", t.line, t.character, e, t)
-            },
+            ParseError::UnexpectedToken(e, t) => format!(
+                "unexpected token at {}:{} : expected one of {:?} found {:?}",
+                t.line, t.character, e, t
+            ),
             ParseError::UnexpectedEndOfTokens => "unexpected end of token stream".to_owned(),
-            ParseError::IllegalToken(t) => {
-                format!("found illegal token {:?}", t)
-            },
-            ParseError::InvalidInteger(t) => {
-                format!("unable to parse `{}` as integer", t.literal)
-            },
+            ParseError::IllegalToken(t) => format!("found illegal token {:?}", t),
+            ParseError::InvalidInteger(t) => format!("unable to parse `{}` as integer", t.literal),
         };
         write!(f, "{}", msg)
     }
@@ -505,7 +477,10 @@ impl ParseError {
     #[allow(dead_code)]
     fn is_equivalent_to(&self, other: &ParseError) -> bool {
         match (self, other) {
-            (ParseError::UnexpectedToken(expected_l, found_l), ParseError::UnexpectedToken(expected_r, found_r)) => {
+            (
+                ParseError::UnexpectedToken(expected_l, found_l),
+                ParseError::UnexpectedToken(expected_r, found_r),
+            ) => {
                 if !found_l.is_equivalent_to(found_r) {
                     return false;
                 }
@@ -515,14 +490,14 @@ impl ParseError {
                 let diff: HashSet<_> = hash_l.symmetric_difference(&hash_r).collect();
 
                 diff.is_empty()
-            },
+            }
             (ParseError::UnexpectedEndOfTokens, ParseError::UnexpectedEndOfTokens) => true,
             (ParseError::IllegalToken(token_l), ParseError::IllegalToken(token_r)) => {
                 token_l.is_equivalent_to(token_r)
-            },
+            }
             (ParseError::InvalidInteger(token_l), ParseError::InvalidInteger(token_r)) => {
                 token_l.is_equivalent_to(token_r)
-            },
+            }
             _ => false,
         }
     }
@@ -540,7 +515,7 @@ impl Parser {
         let len = ts.len();
         Parser {
             tokens: ts,
-            len: len,
+            len,
             cursor: 0,
         }
     }
@@ -572,10 +547,8 @@ impl Parser {
                 } else {
                     Err(ParseError::UnexpectedToken(vec![expected], next))
                 }
-            },
-            None => {
-                Err(ParseError::UnexpectedEndOfTokens)
             }
+            None => Err(ParseError::UnexpectedEndOfTokens),
         }
     }
 
@@ -595,16 +568,17 @@ impl Parser {
                 let expr = self.next_expression()?;
                 self.eat(TokenKind::Semicolon)?;
                 Ok(Statement::Assignment(_let, Identifier(id), expr))
-            },
+            }
             TokenKind::Return => {
                 let _return = self.eat(TokenKind::Return)?;
                 let value = self.next_expression()?;
                 self.eat(TokenKind::Semicolon)?;
                 Ok(Statement::Return(_return, value))
             }
-            _ => {
-                return Err(ParseError::UnexpectedToken(vec![TokenKind::Let], first_token));
-            }
+            _ => Err(ParseError::UnexpectedToken(
+                vec![TokenKind::Let],
+                first_token,
+            )),
         }
     }
 
@@ -659,7 +633,7 @@ impl Parser {
                     Err(_) => return Err(ParseError::InvalidInteger(int)),
                 };
                 Ok(Factor::Integer(int, parsed))
-            },
+            }
             TokenKind::Identifier => {
                 let id = self.eat(TokenKind::Identifier)?;
                 let default = Factor::Identifier(Identifier(id.clone()));
@@ -675,15 +649,13 @@ impl Parser {
                             // Exit loop on `)` or EOF
                             let eof = Err(ParseError::UnexpectedEndOfTokens);
                             match self.peek() {
-                                Some(t) => {
-                                    match t.kind {
-                                        TokenKind::RParen => {
-                                            self.eat(TokenKind::RParen)?;
-                                            break;
-                                        },
-                                        TokenKind::EOF => return eof,
-                                        _ => (),
+                                Some(t) => match t.kind {
+                                    TokenKind::RParen => {
+                                        self.eat(TokenKind::RParen)?;
+                                        break;
                                     }
+                                    TokenKind::EOF => return eof,
+                                    _ => (),
                                 },
                                 None => return eof,
                             };
@@ -694,13 +666,13 @@ impl Parser {
                             params.push(self.next_expression()?);
                         }
                         Ok(Factor::FunctionCall(id, params))
-                    },
+                    }
                     _ => Ok(default),
                 }
-            },
+            }
             _ => Err(ParseError::UnexpectedToken(
                 vec![TokenKind::Integer, TokenKind::Identifier],
-                first_token
+                first_token,
             )),
         }
     }
@@ -721,10 +693,10 @@ pub fn parse(tokens: &[Token]) -> Result<Program, ParseError> {
             TokenKind::Semicolon => {
                 parser.eat(TokenKind::Semicolon)?;
                 continue;
-            },
+            }
             _ => (),
         }
-        
+
         let statement = parser.next_statement()?;
         statements.push(statement);
     }
@@ -747,7 +719,11 @@ mod test {
         let tokens = lex(&src);
         let parsed = parse(&tokens);
 
-        assert!(parsed.is_ok(), "could not parse program: {}", parsed.unwrap_err());
+        assert!(
+            parsed.is_ok(),
+            "could not parse program: {}",
+            parsed.unwrap_err()
+        );
         let program = parsed.unwrap();
 
         assert_eq!(expected_statement_count, program.statements.len());
@@ -760,7 +736,7 @@ mod test {
         let actual = setup(&src, 1).statements.into_iter().next().unwrap();
 
         let expected = Statement::Assignment(
-            Token::basic("let", TokenKind::Let), 
+            Token::basic("let", TokenKind::Let),
             Identifier(Token::basic("abc", TokenKind::Identifier)),
             Factor::Integer(Token::basic("123", TokenKind::Integer), 123).to_expression(),
         );
@@ -774,9 +750,10 @@ mod test {
         let actual = setup(&src, 1).statements.into_iter().next().unwrap();
 
         let expected = Statement::Assignment(
-            Token::basic("let", TokenKind::Let), 
+            Token::basic("let", TokenKind::Let),
             Identifier(Token::basic("xyz", TokenKind::Identifier)),
-            Factor::Identifier(Identifier(Token::basic("abc", TokenKind::Identifier))).to_expression(),
+            Factor::Identifier(Identifier(Token::basic("abc", TokenKind::Identifier)))
+                .to_expression(),
         );
 
         assert!(actual.is_equivalent_to(&expected));
@@ -794,9 +771,11 @@ mod test {
                 Token::basic("add", TokenKind::Identifier),
                 vec![
                     Factor::Integer(Token::basic("1", TokenKind::Integer), 1).to_expression(),
-                    Factor::Identifier(Identifier(Token::basic("abc", TokenKind::Identifier))).to_expression(),
-                ]
-            ).to_expression()
+                    Factor::Identifier(Identifier(Token::basic("abc", TokenKind::Identifier)))
+                        .to_expression(),
+                ],
+            )
+            .to_expression(),
         );
 
         assert!(actual.is_equivalent_to(&expected));
@@ -817,12 +796,16 @@ mod test {
                     Factor::FunctionCall(
                         Token::basic("add", TokenKind::Identifier),
                         vec![
-                            Factor::Integer(Token::basic("2", TokenKind::Integer), 2).to_expression(),
-                            Factor::Integer(Token::basic("3", TokenKind::Integer), 3).to_expression(),
-                        ]
-                    ).to_expression()
-                ]
-            ).to_expression()
+                            Factor::Integer(Token::basic("2", TokenKind::Integer), 2)
+                                .to_expression(),
+                            Factor::Integer(Token::basic("3", TokenKind::Integer), 3)
+                                .to_expression(),
+                        ],
+                    )
+                    .to_expression(),
+                ],
+            )
+            .to_expression(),
         );
 
         assert!(actual.is_equivalent_to(&expected));
@@ -838,7 +821,7 @@ mod test {
         let mut actual = parsed.err().unwrap();
         let mut expected = ParseError::UnexpectedToken(
             vec![TokenKind::Semicolon],
-            Token::basic("", TokenKind::EOF)
+            Token::basic("", TokenKind::EOF),
         );
         assert!(actual.is_equivalent_to(&expected));
 
@@ -850,7 +833,7 @@ mod test {
         actual = parsed.err().unwrap();
         expected = ParseError::UnexpectedToken(
             vec![TokenKind::Assign],
-            Token::basic("123", TokenKind::Integer)
+            Token::basic("123", TokenKind::Integer),
         );
         assert!(actual.is_equivalent_to(&expected));
 
@@ -862,7 +845,7 @@ mod test {
         actual = parsed.err().unwrap();
         expected = ParseError::UnexpectedToken(
             vec![TokenKind::Integer, TokenKind::Identifier],
-            Token::basic(";", TokenKind::Semicolon)
+            Token::basic(";", TokenKind::Semicolon),
         );
         println!("{:?}", actual);
         assert!(actual.is_equivalent_to(&expected));
@@ -875,7 +858,7 @@ mod test {
         actual = parsed.err().unwrap();
         expected = ParseError::UnexpectedToken(
             vec![TokenKind::Identifier],
-            Token::basic("=", TokenKind::Assign)
+            Token::basic("=", TokenKind::Assign),
         );
         assert!(actual.is_equivalent_to(&expected));
     }
@@ -886,7 +869,7 @@ mod test {
         let mut actual = setup(&src, 1).statements.into_iter().next().unwrap();
         let mut expected = Statement::Return(
             Token::basic("return", TokenKind::Return),
-            Factor::Integer(Token::basic("1", TokenKind::Integer), 1).to_expression()
+            Factor::Integer(Token::basic("1", TokenKind::Integer), 1).to_expression(),
         );
         assert!(actual.is_equivalent_to(&expected));
 
@@ -894,7 +877,8 @@ mod test {
         actual = setup(&src, 1).statements.into_iter().next().unwrap();
         expected = Statement::Return(
             Token::basic("return", TokenKind::Return),
-            Factor::Identifier(Identifier(Token::basic("abc", TokenKind::Identifier))).to_expression()
+            Factor::Identifier(Identifier(Token::basic("abc", TokenKind::Identifier)))
+                .to_expression(),
         );
         assert!(actual.is_equivalent_to(&expected));
 
@@ -907,8 +891,9 @@ mod test {
                 vec![
                     Factor::Integer(Token::basic("2", TokenKind::Integer), 2).to_expression(),
                     Factor::Integer(Token::basic("3", TokenKind::Integer), 3).to_expression(),
-                ]
-            ).to_expression()
+                ],
+            )
+            .to_expression(),
         );
         assert!(actual.is_equivalent_to(&expected));
     }
@@ -923,8 +908,9 @@ mod test {
             Term::Term(
                 Factor::Integer(Token::basic("2", TokenKind::Integer), 2),
                 TermBinOp::Multiply,
-                Factor::Identifier(Identifier(Token::basic("b", TokenKind::Identifier)))
-            ).to_expression()
+                Factor::Identifier(Identifier(Token::basic("b", TokenKind::Identifier))),
+            )
+            .to_expression(),
         );
         assert!(actual.is_equivalent_to(&expected));
     }
@@ -939,8 +925,9 @@ mod test {
             Term::Term(
                 Factor::Identifier(Identifier(Token::basic("b", TokenKind::Identifier))),
                 TermBinOp::Divide,
-                Factor::Integer(Token::basic("2", TokenKind::Integer), 2)
-            ).to_expression()
+                Factor::Integer(Token::basic("2", TokenKind::Integer), 2),
+            )
+            .to_expression(),
         );
         assert!(actual.is_equivalent_to(&expected));
     }
@@ -953,14 +940,18 @@ mod test {
             Token::basic("let", TokenKind::Let),
             Identifier(Token::basic("a", TokenKind::Identifier)),
             Term::Term(
-                Factor::Wrapped(Term::Term(
-                    Factor::Integer(Token::basic("2", TokenKind::Integer), 2),
-                    TermBinOp::Multiply,
-                    Factor::Integer(Token::basic("2", TokenKind::Integer), 2)
-                ).to_expression()),
+                Factor::Wrapped(
+                    Term::Term(
+                        Factor::Integer(Token::basic("2", TokenKind::Integer), 2),
+                        TermBinOp::Multiply,
+                        Factor::Integer(Token::basic("2", TokenKind::Integer), 2),
+                    )
+                    .to_expression(),
+                ),
                 TermBinOp::Multiply,
-                Factor::Integer(Token::basic("2", TokenKind::Integer), 2)
-            ).to_expression()
+                Factor::Integer(Token::basic("2", TokenKind::Integer), 2),
+            )
+            .to_expression(),
         );
         assert!(actual.is_equivalent_to(&expected));
     }
@@ -975,8 +966,12 @@ mod test {
             AdditiveExpr::AdditiveExpr(
                 Term::Wrapped(Factor::Integer(Token::basic("2", TokenKind::Integer), 2)),
                 AdditiveBinOp::Add,
-                Term::Wrapped(Factor::Identifier(Identifier(Token::basic("b", TokenKind::Identifier))))
-            ).to_expression()
+                Term::Wrapped(Factor::Identifier(Identifier(Token::basic(
+                    "b",
+                    TokenKind::Identifier,
+                )))),
+            )
+            .to_expression(),
         );
         assert!(actual.is_equivalent_to(&expected));
     }
@@ -991,8 +986,12 @@ mod test {
             AdditiveExpr::AdditiveExpr(
                 Term::Wrapped(Factor::Integer(Token::basic("2", TokenKind::Integer), 2)),
                 AdditiveBinOp::Subtract,
-                Term::Wrapped(Factor::Identifier(Identifier(Token::basic("b", TokenKind::Identifier))))
-            ).to_expression()
+                Term::Wrapped(Factor::Identifier(Identifier(Token::basic(
+                    "b",
+                    TokenKind::Identifier,
+                )))),
+            )
+            .to_expression(),
         );
         assert!(actual.is_equivalent_to(&expected));
     }
