@@ -1,9 +1,8 @@
 use std::io::{self, Write};
 
 fn read_line(prompt: Option<String>) -> io::Result<String> {
-    match prompt {
-        Some(p) => print!("{}", p),
-        None => (),
+    if let Some(p) = prompt {
+        print!("{}", p)
     }
     let _ = io::stdout().flush();
 
