@@ -176,10 +176,14 @@ impl Parser {
         Minus, Subtract
     );
 
-    impl_next_repeatable_binop!(next_term; Term; next_factor; TermBinOp;
+    impl_next_repeatable_binop!(next_term; Term; next_prefix; TermBinOp;
         Asterisk, Multiply;
         Slash, Divide
     );
+
+    fn next_prefix(&mut self, first_token: Token) -> Result<PrefixExpr, ParseError> {
+        Err(ParseError::UnexpectedEndOfTokens)
+    }
 
     fn next_factor(&mut self, first_token: Token) -> Result<Factor, ParseError> {
         match first_token.kind {

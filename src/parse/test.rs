@@ -423,3 +423,10 @@ fn greater_than_or_equal() {
     );
     assert!(actual.is_equivalent_to(&expected));
 }
+
+#[test]
+fn negation() {
+    let src = "return !a;";
+    let actual = setup(&src, 1); //.statements.into_iter().next().unwrap();
+    println!("{:?}", actual);
+}

@@ -1,5 +1,6 @@
-use crate::lex::Token;
+use std::fmt::{Formatter, Result};
 
+use crate::lex::Token;
 use parse::helpers::*;
 
 pub type Expression = Box<EqualityExpr>;
@@ -8,8 +9,8 @@ pub type Expression = Box<EqualityExpr>;
 pub struct Identifier(pub Token);
 
 impl std::fmt::Display for Identifier {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.0.literal)
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        self.0.literal.fmt(f)
     }
 }
 
@@ -58,12 +59,11 @@ impl EquivalentTo for Statement {
 }
 
 impl std::fmt::Display for Statement {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let msg = match self {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        match self {
             Statement::Assignment(_, id, value) => format!("let {} = {};", id, value),
             Statement::Return(_, value) => format!("return {};", value),
-        };
-        write!(f, "{}", msg)
+        }.fmt(f)
     }
 }
 
@@ -92,7 +92,8 @@ impl AsParent<Factor> for EqualityExpr {
         let relational = wrapped_or_return_none!(self, EqualityExpr);
         let additive = wrapped_or_return_none!(relational, RelationalExpr);
         let term = wrapped_or_return_none!(additive, AdditiveExpr);
-        let factor = wrapped_or_return_none!(term, Term);
+        let prefix = wrapped_or_return_none!(term, Term);
+        let factor = wrapped_or_return_none!(prefix, PrefixExpr);
         match factor {
             Factor::Wrapped(e) => e.as_parent(),
             _ => Some(factor.clone()),
@@ -108,8 +109,8 @@ impl ToExpression for EqualityExpr {
 
 impl ToChild<RelationalExpr> for EqualityExpr {
     fn to_child(&self) -> RelationalExpr {
-        RelationalExpr::Wrapped(AdditiveExpr::Wrapped(Term::Wrapped(Factor::Wrapped(
-            self.to_expression(),
+        RelationalExpr::Wrapped(AdditiveExpr::Wrapped(Term::Wrapped(PrefixExpr::Wrapped(
+            Factor::Wrapped(self.to_expression()),
         ))))
     }
 }
@@ -142,7 +143,8 @@ impl AsParent<EqualityExpr> for RelationalExpr {
     fn as_parent(&self) -> Option<EqualityExpr> {
         let additive = wrapped_or_return_none!(self, RelationalExpr);
         let term = wrapped_or_return_none!(additive, AdditiveExpr);
-        let factor = wrapped_or_return_none!(term, Term);
+        let prefix = wrapped_or_return_none!(term, Term);
+        let factor = wrapped_or_return_none!(prefix, PrefixExpr);
         let equality = wrapped_or_return_none!(factor, Factor);
         let unboxed = *(*equality).clone();
         Some(unboxed)
@@ -157,7 +159,9 @@ impl ToExpression for RelationalExpr {
 
 impl ToChild<AdditiveExpr> for RelationalExpr {
     fn to_child(&self) -> AdditiveExpr {
-        AdditiveExpr::Wrapped(Term::Wrapped(Factor::Wrapped(self.to_expression())))
+        AdditiveExpr::Wrapped(Term::Wrapped(PrefixExpr::Wrapped(Factor::Wrapped(
+            self.to_expression(),
+        ))))
     }
 }
 
@@ -184,7 +188,8 @@ impl_display_binop!(
 impl AsParent<RelationalExpr> for AdditiveExpr {
     fn as_parent(&self) -> Option<RelationalExpr> {
         let term = wrapped_or_return_none!(self, AdditiveExpr);
-        let factor = wrapped_or_return_none!(term, Term);
+        let prefix = wrapped_or_return_none!(term, Term);
+        let factor = wrapped_or_return_none!(prefix, PrefixExpr);
         let equality = wrapped_or_return_none!(factor, Factor);
         let unboxed = *(*equality).clone();
         let relational = wrapped_or_return_none!(unboxed, EqualityExpr);
@@ -200,14 +205,14 @@ impl ToExpression for AdditiveExpr {
 
 impl ToChild<Term> for AdditiveExpr {
     fn to_child(&self) -> Term {
-        Term::Wrapped(Factor::Wrapped(self.to_expression()))
+        Term::Wrapped(PrefixExpr::Wrapped(Factor::Wrapped(self.to_expression())))
     }
 }
 
 #[derive(Clone, Debug)]
 pub enum Term {
-    Wrapped(Factor),
-    Term(Box<Factor>, TermBinOp, Box<Factor>),
+    Wrapped(PrefixExpr),
+    Term(Box<PrefixExpr>, TermBinOp, Box<PrefixExpr>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -226,7 +231,8 @@ impl_display_binop!(
 
 impl AsParent<AdditiveExpr> for Term {
     fn as_parent(&self) -> Option<AdditiveExpr> {
-        let factor = wrapped_or_return_none!(self, Term);
+        let prefix = wrapped_or_return_none!(self, Term);
+        let factor = wrapped_or_return_none!(prefix, PrefixExpr);
         let equality = wrapped_or_return_none!(factor, Factor);
         let unboxed = *(*equality).clone();
         let relational = wrapped_or_return_none!(unboxed, EqualityExpr);
@@ -243,9 +249,61 @@ impl ToExpression for Term {
     }
 }
 
-impl ToChild<Factor> for Term {
+impl ToChild<PrefixExpr> for Term {
+    fn to_child(&self) -> PrefixExpr {
+        PrefixExpr::Wrapped(Factor::Wrapped(self.to_expression()))
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum PrefixExpr {
+    Wrapped(Factor),
+    Invert(Factor),
+    Negate(Factor),
+}
+
+impl AsParent<Term> for PrefixExpr {
+    fn as_parent(&self) -> Option<Term> {
+        let factor = wrapped_or_return_none!(self, PrefixExpr);
+        let equality = wrapped_or_return_none!(factor, Factor);
+        let unboxed = *(*equality).clone();
+        let relational = wrapped_or_return_none!(unboxed, EqualityExpr);
+        let additive = wrapped_or_return_none!(relational, RelationalExpr);
+        let term = wrapped_or_return_none!(additive, AdditiveExpr);
+        Some(term)
+    }
+}
+
+impl EquivalentTo for PrefixExpr {
+    fn is_equivalent_to(&self, other: &PrefixExpr) -> bool {
+        // TODO: implement me
+        false
+    }
+}
+
+impl ToExpression for PrefixExpr {
+    fn to_expression(&self) -> Expression {
+        Box::new(EqualityExpr::Wrapped(RelationalExpr::Wrapped(
+            AdditiveExpr::Wrapped(Term::Wrapped(self.clone())),
+        )))
+    }
+}
+
+impl ToChild<Factor> for PrefixExpr {
     fn to_child(&self) -> Factor {
         Factor::Wrapped(self.to_expression())
+    }
+}
+
+impl std::fmt::Display for PrefixExpr {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        let (prefix, factor) = match self {
+            PrefixExpr::Wrapped(factor) => return factor.fmt(f),
+            PrefixExpr::Invert(factor) => ("!", factor),
+            PrefixExpr::Negate(factor) => ("-", factor),
+        };
+        prefix.fmt(f)?;
+        factor.fmt(f)
     }
 }
 
@@ -257,14 +315,15 @@ pub enum Factor {
     FunctionCall(Token, Vec<Expression>),
 }
 
-impl AsParent<Term> for Factor {
-    fn as_parent(&self) -> Option<Term> {
+impl AsParent<PrefixExpr> for Factor {
+    fn as_parent(&self) -> Option<PrefixExpr> {
         let equality = wrapped_or_return_none!(self, Factor);
         let unboxed = *(*equality).clone();
         let relational = wrapped_or_return_none!(unboxed, EqualityExpr);
         let additive = wrapped_or_return_none!(relational, RelationalExpr);
         let term = wrapped_or_return_none!(additive, AdditiveExpr);
-        Some(term)
+        let prefix = wrapped_or_return_none!(term, Term);
+        Some(prefix)
     }
 }
 
@@ -304,7 +363,7 @@ impl ToExpression for Factor {
     fn to_expression(&self) -> Expression {
         let wrapped = |v: &Self| {
             Box::new(EqualityExpr::Wrapped(RelationalExpr::Wrapped(
-                AdditiveExpr::Wrapped(Term::Wrapped(v.clone())),
+                AdditiveExpr::Wrapped(Term::Wrapped(PrefixExpr::Wrapped(v.clone()))),
             )))
         };
 
@@ -318,21 +377,23 @@ impl ToExpression for Factor {
 }
 
 impl std::fmt::Display for Factor {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let msg: String = match self {
-            Factor::Wrapped(e) => format!("{}", e),
-            Factor::Identifier(t) => t.0.literal.clone(),
-            Factor::Integer(t, _) => t.literal.clone(),
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        match self {
+            Factor::Wrapped(e) => e.fmt(f),
+            Factor::Identifier(t) => t.0.literal.fmt(f),
+            Factor::Integer(t, _) => t.literal.fmt(f),
             Factor::FunctionCall(id, params) => {
                 let param_strs = match params.split_first() {
                     Some((first, rest)) => rest
                         .iter()
                         .fold(format!("{}", first), |a, b| format!("{}, {}", a, b)),
-                    None => "".to_owned(),
+                    None => String::new(),
                 };
-                format!("{}({})", id.literal, param_strs)
+                id.literal.fmt(f)?;
+                "(".fmt(f)?;
+                param_strs.fmt(f)?;
+                ")".fmt(f)
             }
-        };
-        write!(f, "{}", msg)
+        }
     }
 }

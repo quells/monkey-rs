@@ -58,7 +58,7 @@ macro_rules! impl_display_binop {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 match self {
                     $(
-                        $this::$op => write!(f, "{}", $literal)
+                        $this::$op => $literal.fmt(f)
                     ),*
                 }
             }
