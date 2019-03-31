@@ -159,15 +159,6 @@ impl Parser {
         }
     }
 
-    // fn next_equality_expr(&mut self, first_token: Token) -> Result<EqualityExpr, ParseError> {
-    //     let lhs = self.next_relational_expr(first_token);
-    //     // FIXME: check for equality operator
-    //     match lhs {
-    //         Ok(expr) => Ok(EqualityExpr::Wrapped(expr)),
-    //         Err(e) => Err(e),
-    //     }
-    // }
-
     impl_next_binop!(next_equality_expr; EqualityExpr; next_relational_expr; EqualityBinOp;
         EqualTo, Equal;
         NotEqualTo, NotEqual
