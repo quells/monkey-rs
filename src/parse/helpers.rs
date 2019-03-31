@@ -90,6 +90,27 @@ macro_rules! impl_display_binop {
     }
 }
 
+macro_rules! impl_next_unop {
+    ($fn:tt; $this:ident; $next_fn:tt; $( $token:tt, $op:tt );+ ) => {
+        fn $fn(&mut self, first_token: Token) -> Result<$this, ParseError> {
+            match first_token.kind {
+                $(
+                    TokenKind::$token => {
+                        self.eat(first_token.kind)?;
+                        let next_token = self.next_token()?;
+                        let operand = self.$next_fn(next_token)?;
+                        Ok($this::$op(operand))
+                    },
+                )*
+                _ => {
+                    let wrapped = self.$next_fn(first_token)?;
+                    Ok($this::Wrapped(wrapped))
+                },
+            }
+        }
+    };
+}
+
 macro_rules! impl_next_binop {
     ($fn:tt; $this:ident; $next_fn:tt; $opkind:tt; $( $token:tt, $op:tt );+ ) => {
         fn $fn(&mut self, first_token: Token) -> Result<$this, ParseError> {

@@ -63,7 +63,8 @@ impl std::fmt::Display for Statement {
         match self {
             Statement::Assignment(_, id, value) => format!("let {} = {};", id, value),
             Statement::Return(_, value) => format!("return {};", value),
-        }.fmt(f)
+        }
+        .fmt(f)
     }
 }
 
