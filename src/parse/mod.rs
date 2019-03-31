@@ -118,13 +118,15 @@ impl Parser {
         }
     }
 
+    fn next_token(&self) -> Result<Token, ParseError> {
+        match self.peek() {
+            Some(t) => Ok(t),
+            None => Err(ParseError::UnexpectedEndOfTokens),
+        }
+    }
+
     fn next_statement(&mut self) -> Result<Statement, ParseError> {
-        let first_token = match self.peek() {
-            Some(t) => t,
-            None => {
-                return Err(ParseError::UnexpectedEndOfTokens);
-            }
-        };
+        let first_token = self.next_token()?;
 
         match first_token.kind {
             TokenKind::Let => {
@@ -149,12 +151,7 @@ impl Parser {
     }
 
     fn next_expression(&mut self) -> Result<Expression, ParseError> {
-        let first_token = match self.peek() {
-            Some(t) => t,
-            None => {
-                return Err(ParseError::UnexpectedEndOfTokens);
-            }
-        };
+        let first_token = self.next_token()?;
 
         match self.next_equality_expr(first_token) {
             Ok(expr) => Ok(Box::new(expr)),
@@ -162,30 +159,33 @@ impl Parser {
         }
     }
 
-    fn next_equality_expr(&mut self, first_token: Token) -> Result<EqualityExpr, ParseError> {
-        let lhs = self.next_relational_expr(first_token);
-        // FIXME: check for equality operator
-        match lhs {
-            Ok(expr) => Ok(EqualityExpr::Wrapped(expr)),
-            Err(e) => Err(e),
-        }
-    }
+    // fn next_equality_expr(&mut self, first_token: Token) -> Result<EqualityExpr, ParseError> {
+    //     let lhs = self.next_relational_expr(first_token);
+    //     // FIXME: check for equality operator
+    //     match lhs {
+    //         Ok(expr) => Ok(EqualityExpr::Wrapped(expr)),
+    //         Err(e) => Err(e),
+    //     }
+    // }
 
-    fn next_relational_expr(&mut self, first_token: Token) -> Result<RelationalExpr, ParseError> {
-        let lhs = self.next_additive_expr(first_token);
-        // FIXME: check for relational operator
-        match lhs {
-            Ok(expr) => Ok(RelationalExpr::Wrapped(expr)),
-            Err(e) => Err(e),
-        }
-    }
+    impl_next_binop!(next_equality_expr; EqualityExpr; next_relational_expr; EqualityBinOp;
+        EqualTo, Equal;
+        NotEqualTo, NotEqual
+    );
 
-    impl_next_binop!(next_additive_expr; AdditiveExpr; next_term; AdditiveBinOp;
+    impl_next_binop!(next_relational_expr; RelationalExpr; next_additive_expr; RelationalBinOp;
+        LessThan, LessThan;
+        LessThanOrEqual, LessThanEqual;
+        GreaterThan, GreaterThan;
+        GreaterThanOrEqual, GreaterThanEqual
+    );
+
+    impl_next_repeatable_binop!(next_additive_expr; AdditiveExpr; next_term; AdditiveBinOp;
         Plus, Add;
         Minus, Subtract
     );
 
-    impl_next_binop!(next_term; Term; next_factor; TermBinOp;
+    impl_next_repeatable_binop!(next_term; Term; next_factor; TermBinOp;
         Asterisk, Multiply;
         Slash, Divide
     );

@@ -47,7 +47,7 @@ pub fn parser(debug: bool) {
         let mut lex_time = time::precise_time_ns();
         let tokens = lex(&input);
         lex_time = time::precise_time_ns() - lex_time;
-        
+
         let mut parse_time = time::precise_time_ns();
         let program = parse(&tokens);
         parse_time = time::precise_time_ns() - parse_time;

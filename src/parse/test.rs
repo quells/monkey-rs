@@ -289,3 +289,129 @@ fn subtraction() {
     );
     assert!(actual.is_equivalent_to(&expected));
 }
+
+#[test]
+fn equal() {
+    let src = "return a == b;";
+    let actual = setup(&src, 1).statements.into_iter().next().unwrap();
+    let lhs = RelationalExpr::Wrapped(AdditiveExpr::Wrapped(Term::Wrapped(Factor::Identifier(
+        Identifier(Token::basic("a", TokenKind::Identifier)),
+    ))));
+    let rhs = RelationalExpr::Wrapped(AdditiveExpr::Wrapped(Term::Wrapped(Factor::Identifier(
+        Identifier(Token::basic("b", TokenKind::Identifier)),
+    ))));
+    let expected = Statement::Return(
+        Token::basic("return", TokenKind::Return),
+        Box::new(EqualityExpr::EqualityExpr(
+            Box::new(lhs),
+            EqualityBinOp::Equal,
+            Box::new(rhs),
+        )),
+    );
+    assert!(actual.is_equivalent_to(&expected));
+}
+
+#[test]
+fn not_equal() {
+    let src = "return a != b;";
+    let actual = setup(&src, 1).statements.into_iter().next().unwrap();
+    let lhs = RelationalExpr::Wrapped(AdditiveExpr::Wrapped(Term::Wrapped(Factor::Identifier(
+        Identifier(Token::basic("a", TokenKind::Identifier)),
+    ))));
+    let rhs = RelationalExpr::Wrapped(AdditiveExpr::Wrapped(Term::Wrapped(Factor::Identifier(
+        Identifier(Token::basic("b", TokenKind::Identifier)),
+    ))));
+    let expected = Statement::Return(
+        Token::basic("return", TokenKind::Return),
+        Box::new(EqualityExpr::EqualityExpr(
+            Box::new(lhs),
+            EqualityBinOp::NotEqual,
+            Box::new(rhs),
+        )),
+    );
+    assert!(actual.is_equivalent_to(&expected));
+}
+
+#[test]
+fn less_than() {
+    let src = "return a < b;";
+    let actual = setup(&src, 1).statements.into_iter().next().unwrap();
+    let lhs = AdditiveExpr::Wrapped(Term::Wrapped(Factor::Identifier(
+        Identifier(Token::basic("a", TokenKind::Identifier)),
+    )));
+    let rhs = AdditiveExpr::Wrapped(Term::Wrapped(Factor::Identifier(
+        Identifier(Token::basic("b", TokenKind::Identifier)),
+    )));
+    let expected = Statement::Return(
+        Token::basic("return", TokenKind::Return),
+        Box::new(EqualityExpr::Wrapped(RelationalExpr::RelationalExpr(
+            Box::new(lhs),
+            RelationalBinOp::LessThan,
+            Box::new(rhs),
+        ))),
+    );
+    assert!(actual.is_equivalent_to(&expected));
+}
+
+#[test]
+fn less_than_or_equal() {
+    let src = "return a <= b;";
+    let actual = setup(&src, 1).statements.into_iter().next().unwrap();
+    let lhs = AdditiveExpr::Wrapped(Term::Wrapped(Factor::Identifier(
+        Identifier(Token::basic("a", TokenKind::Identifier)),
+    )));
+    let rhs = AdditiveExpr::Wrapped(Term::Wrapped(Factor::Identifier(
+        Identifier(Token::basic("b", TokenKind::Identifier)),
+    )));
+    let expected = Statement::Return(
+        Token::basic("return", TokenKind::Return),
+        Box::new(EqualityExpr::Wrapped(RelationalExpr::RelationalExpr(
+            Box::new(lhs),
+            RelationalBinOp::LessThanEqual,
+            Box::new(rhs),
+        ))),
+    );
+    assert!(actual.is_equivalent_to(&expected));
+}
+
+#[test]
+fn greater_than() {
+    let src = "return a > b;";
+    let actual = setup(&src, 1).statements.into_iter().next().unwrap();
+    let lhs = AdditiveExpr::Wrapped(Term::Wrapped(Factor::Identifier(
+        Identifier(Token::basic("a", TokenKind::Identifier)),
+    )));
+    let rhs = AdditiveExpr::Wrapped(Term::Wrapped(Factor::Identifier(
+        Identifier(Token::basic("b", TokenKind::Identifier)),
+    )));
+    let expected = Statement::Return(
+        Token::basic("return", TokenKind::Return),
+        Box::new(EqualityExpr::Wrapped(RelationalExpr::RelationalExpr(
+            Box::new(lhs),
+            RelationalBinOp::GreaterThan,
+            Box::new(rhs),
+        ))),
+    );
+    assert!(actual.is_equivalent_to(&expected));
+}
+
+#[test]
+fn greater_than_or_equal() {
+    let src = "return a >= b;";
+    let actual = setup(&src, 1).statements.into_iter().next().unwrap();
+    let lhs = AdditiveExpr::Wrapped(Term::Wrapped(Factor::Identifier(
+        Identifier(Token::basic("a", TokenKind::Identifier)),
+    )));
+    let rhs = AdditiveExpr::Wrapped(Term::Wrapped(Factor::Identifier(
+        Identifier(Token::basic("b", TokenKind::Identifier)),
+    )));
+    let expected = Statement::Return(
+        Token::basic("return", TokenKind::Return),
+        Box::new(EqualityExpr::Wrapped(RelationalExpr::RelationalExpr(
+            Box::new(lhs),
+            RelationalBinOp::GreaterThanEqual,
+            Box::new(rhs),
+        ))),
+    );
+    assert!(actual.is_equivalent_to(&expected));
+}

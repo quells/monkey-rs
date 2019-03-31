@@ -67,10 +67,36 @@ macro_rules! impl_display_binop {
 }
 
 macro_rules! impl_next_binop {
-    ($fn:tt; $this:ident; $next:tt; $opkind:tt; $( $token:tt, $op:tt );+ ) => {
+    ($fn:tt; $this:ident; $next_fn:tt; $opkind:tt; $( $token:tt, $op:tt );+ ) => {
+        fn $fn(&mut self, first_token: Token) -> Result<$this, ParseError> {
+            let lhs = self.$next_fn(first_token)?;
+
+            let op = match self.peek() {
+                Some(t) => match t.kind {
+                    $(
+                        TokenKind::$token => {
+                            self.eat(t.kind)?;
+                            $opkind::$op
+                        }
+                    ),*,
+                    _ => return Ok($this::Wrapped(lhs))
+                }
+                None => return Err(ParseError::UnexpectedEndOfTokens)
+            };
+
+            let next_token = self.next_token()?;
+            let rhs = self.$next_fn(next_token)?;
+
+            Ok($this::$this(Box::new(lhs), op, Box::new(rhs)))
+        }
+    };
+}
+
+macro_rules! impl_next_repeatable_binop {
+    ($fn:tt; $this:ident; $next_fn:tt; $opkind:tt; $( $token:tt, $op:tt );+ ) => {
         fn $fn(&mut self, first_token: Token) -> Result<$this, ParseError> {
             // left associative
-            let mut lhs = self.$next(first_token)?;
+            let mut lhs = self.$next_fn(first_token)?;
 
             loop {
                 let op_token = match self.peek() {
@@ -89,7 +115,7 @@ macro_rules! impl_next_binop {
                     Some(t) => t,
                     None => return Err(ParseError::UnexpectedEndOfTokens),
                 };
-                let rhs = self.$next(next_token)?;
+                let rhs = self.$next_fn(next_token)?;
 
                 lhs = $this::$this(Box::new(lhs.clone()), op, Box::new(rhs)).to_child();
             }
