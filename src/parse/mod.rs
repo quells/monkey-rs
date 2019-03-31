@@ -182,7 +182,8 @@ impl Parser {
     );
 
     fn next_prefix(&mut self, first_token: Token) -> Result<PrefixExpr, ParseError> {
-        Err(ParseError::UnexpectedEndOfTokens)
+        let factor = self.next_factor(first_token)?;
+        Ok(PrefixExpr::Wrapped(factor))
     }
 
     fn next_factor(&mut self, first_token: Token) -> Result<Factor, ParseError> {

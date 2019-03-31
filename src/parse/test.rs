@@ -188,12 +188,12 @@ fn multiplication() {
         Token::basic("let", TokenKind::Let),
         Identifier(Token::basic("a", TokenKind::Identifier)),
         Term::Term(
-            Box::new(Factor::Integer(Token::basic("2", TokenKind::Integer), 2)),
+            Box::new(PrefixExpr::Wrapped(Factor::Integer(Token::basic("2", TokenKind::Integer), 2))),
             TermBinOp::Multiply,
-            Box::new(Factor::Identifier(Identifier(Token::basic(
+            Box::new(PrefixExpr::Wrapped(Factor::Identifier(Identifier(Token::basic(
                 "b",
                 TokenKind::Identifier,
-            )))),
+            ))))),
         )
         .to_expression(),
     );
@@ -208,12 +208,12 @@ fn division() {
         Token::basic("let", TokenKind::Let),
         Identifier(Token::basic("a", TokenKind::Identifier)),
         Term::Term(
-            Box::new(Factor::Identifier(Identifier(Token::basic(
+            Box::new(PrefixExpr::Wrapped(Factor::Identifier(Identifier(Token::basic(
                 "b",
                 TokenKind::Identifier,
-            )))),
+            ))))),
             TermBinOp::Divide,
-            Box::new(Factor::Integer(Token::basic("2", TokenKind::Integer), 2)),
+            Box::new(PrefixExpr::Wrapped(Factor::Integer(Token::basic("2", TokenKind::Integer), 2))),
         )
         .to_expression(),
     );
@@ -228,16 +228,16 @@ fn repeated_term() {
         Token::basic("let", TokenKind::Let),
         Identifier(Token::basic("a", TokenKind::Identifier)),
         Term::Term(
-            Box::new(Factor::Wrapped(
+            Box::new(PrefixExpr::Wrapped(Factor::Wrapped(
                 Term::Term(
-                    Box::new(Factor::Integer(Token::basic("2", TokenKind::Integer), 2)),
+                    Box::new(PrefixExpr::Wrapped(Factor::Integer(Token::basic("2", TokenKind::Integer), 2))),
                     TermBinOp::Multiply,
-                    Box::new(Factor::Integer(Token::basic("2", TokenKind::Integer), 2)),
+                    Box::new(PrefixExpr::Wrapped(Factor::Integer(Token::basic("2", TokenKind::Integer), 2))),
                 )
                 .to_expression(),
-            )),
+            ))),
             TermBinOp::Multiply,
-            Box::new(Factor::Integer(Token::basic("2", TokenKind::Integer), 2)),
+            Box::new(PrefixExpr::Wrapped(Factor::Integer(Token::basic("2", TokenKind::Integer), 2))),
         )
         .to_expression(),
     );
@@ -252,15 +252,15 @@ fn addition() {
         Token::basic("let", TokenKind::Let),
         Identifier(Token::basic("a", TokenKind::Identifier)),
         AdditiveExpr::AdditiveExpr(
-            Box::new(Term::Wrapped(Factor::Integer(
+            Box::new(Term::Wrapped(PrefixExpr::Wrapped(Factor::Integer(
                 Token::basic("2", TokenKind::Integer),
                 2,
-            ))),
+            )))),
             AdditiveBinOp::Add,
-            Box::new(Term::Wrapped(Factor::Identifier(Identifier(Token::basic(
+            Box::new(Term::Wrapped(PrefixExpr::Wrapped(Factor::Identifier(Identifier(Token::basic(
                 "b",
                 TokenKind::Identifier,
-            ))))),
+            )))))),
         )
         .to_expression(),
     );
@@ -275,15 +275,15 @@ fn subtraction() {
         Token::basic("let", TokenKind::Let),
         Identifier(Token::basic("a", TokenKind::Identifier)),
         AdditiveExpr::AdditiveExpr(
-            Box::new(Term::Wrapped(Factor::Integer(
+            Box::new(Term::Wrapped(PrefixExpr::Wrapped(Factor::Integer(
                 Token::basic("2", TokenKind::Integer),
                 2,
-            ))),
+            )))),
             AdditiveBinOp::Subtract,
-            Box::new(Term::Wrapped(Factor::Identifier(Identifier(Token::basic(
+            Box::new(Term::Wrapped(PrefixExpr::Wrapped(Factor::Identifier(Identifier(Token::basic(
                 "b",
                 TokenKind::Identifier,
-            ))))),
+            )))))),
         )
         .to_expression(),
     );
@@ -294,12 +294,12 @@ fn subtraction() {
 fn equal() {
     let src = "return a == b;";
     let actual = setup(&src, 1).statements.into_iter().next().unwrap();
-    let lhs = RelationalExpr::Wrapped(AdditiveExpr::Wrapped(Term::Wrapped(Factor::Identifier(
+    let lhs = RelationalExpr::Wrapped(AdditiveExpr::Wrapped(Term::Wrapped(PrefixExpr::Wrapped(Factor::Identifier(
         Identifier(Token::basic("a", TokenKind::Identifier)),
-    ))));
-    let rhs = RelationalExpr::Wrapped(AdditiveExpr::Wrapped(Term::Wrapped(Factor::Identifier(
+    )))));
+    let rhs = RelationalExpr::Wrapped(AdditiveExpr::Wrapped(Term::Wrapped(PrefixExpr::Wrapped(Factor::Identifier(
         Identifier(Token::basic("b", TokenKind::Identifier)),
-    ))));
+    )))));
     let expected = Statement::Return(
         Token::basic("return", TokenKind::Return),
         Box::new(EqualityExpr::EqualityExpr(
@@ -315,12 +315,12 @@ fn equal() {
 fn not_equal() {
     let src = "return a != b;";
     let actual = setup(&src, 1).statements.into_iter().next().unwrap();
-    let lhs = RelationalExpr::Wrapped(AdditiveExpr::Wrapped(Term::Wrapped(Factor::Identifier(
+    let lhs = RelationalExpr::Wrapped(AdditiveExpr::Wrapped(Term::Wrapped(PrefixExpr::Wrapped(Factor::Identifier(
         Identifier(Token::basic("a", TokenKind::Identifier)),
-    ))));
-    let rhs = RelationalExpr::Wrapped(AdditiveExpr::Wrapped(Term::Wrapped(Factor::Identifier(
+    )))));
+    let rhs = RelationalExpr::Wrapped(AdditiveExpr::Wrapped(Term::Wrapped(PrefixExpr::Wrapped(Factor::Identifier(
         Identifier(Token::basic("b", TokenKind::Identifier)),
-    ))));
+    )))));
     let expected = Statement::Return(
         Token::basic("return", TokenKind::Return),
         Box::new(EqualityExpr::EqualityExpr(
@@ -336,14 +336,14 @@ fn not_equal() {
 fn less_than() {
     let src = "return a < b;";
     let actual = setup(&src, 1).statements.into_iter().next().unwrap();
-    let lhs = AdditiveExpr::Wrapped(Term::Wrapped(Factor::Identifier(Identifier(Token::basic(
+    let lhs = AdditiveExpr::Wrapped(Term::Wrapped(PrefixExpr::Wrapped(Factor::Identifier(Identifier(Token::basic(
         "a",
         TokenKind::Identifier,
-    )))));
-    let rhs = AdditiveExpr::Wrapped(Term::Wrapped(Factor::Identifier(Identifier(Token::basic(
+    ))))));
+    let rhs = AdditiveExpr::Wrapped(Term::Wrapped(PrefixExpr::Wrapped(Factor::Identifier(Identifier(Token::basic(
         "b",
         TokenKind::Identifier,
-    )))));
+    ))))));
     let expected = Statement::Return(
         Token::basic("return", TokenKind::Return),
         Box::new(EqualityExpr::Wrapped(RelationalExpr::RelationalExpr(
@@ -359,14 +359,14 @@ fn less_than() {
 fn less_than_or_equal() {
     let src = "return a <= b;";
     let actual = setup(&src, 1).statements.into_iter().next().unwrap();
-    let lhs = AdditiveExpr::Wrapped(Term::Wrapped(Factor::Identifier(Identifier(Token::basic(
+    let lhs = AdditiveExpr::Wrapped(Term::Wrapped(PrefixExpr::Wrapped(Factor::Identifier(Identifier(Token::basic(
         "a",
         TokenKind::Identifier,
-    )))));
-    let rhs = AdditiveExpr::Wrapped(Term::Wrapped(Factor::Identifier(Identifier(Token::basic(
+    ))))));
+    let rhs = AdditiveExpr::Wrapped(Term::Wrapped(PrefixExpr::Wrapped(Factor::Identifier(Identifier(Token::basic(
         "b",
         TokenKind::Identifier,
-    )))));
+    ))))));
     let expected = Statement::Return(
         Token::basic("return", TokenKind::Return),
         Box::new(EqualityExpr::Wrapped(RelationalExpr::RelationalExpr(
@@ -382,14 +382,14 @@ fn less_than_or_equal() {
 fn greater_than() {
     let src = "return a > b;";
     let actual = setup(&src, 1).statements.into_iter().next().unwrap();
-    let lhs = AdditiveExpr::Wrapped(Term::Wrapped(Factor::Identifier(Identifier(Token::basic(
+    let lhs = AdditiveExpr::Wrapped(Term::Wrapped(PrefixExpr::Wrapped(Factor::Identifier(Identifier(Token::basic(
         "a",
         TokenKind::Identifier,
-    )))));
-    let rhs = AdditiveExpr::Wrapped(Term::Wrapped(Factor::Identifier(Identifier(Token::basic(
+    ))))));
+    let rhs = AdditiveExpr::Wrapped(Term::Wrapped(PrefixExpr::Wrapped(Factor::Identifier(Identifier(Token::basic(
         "b",
         TokenKind::Identifier,
-    )))));
+    ))))));
     let expected = Statement::Return(
         Token::basic("return", TokenKind::Return),
         Box::new(EqualityExpr::Wrapped(RelationalExpr::RelationalExpr(
@@ -405,14 +405,14 @@ fn greater_than() {
 fn greater_than_or_equal() {
     let src = "return a >= b;";
     let actual = setup(&src, 1).statements.into_iter().next().unwrap();
-    let lhs = AdditiveExpr::Wrapped(Term::Wrapped(Factor::Identifier(Identifier(Token::basic(
+    let lhs = AdditiveExpr::Wrapped(Term::Wrapped(PrefixExpr::Wrapped(Factor::Identifier(Identifier(Token::basic(
         "a",
         TokenKind::Identifier,
-    )))));
-    let rhs = AdditiveExpr::Wrapped(Term::Wrapped(Factor::Identifier(Identifier(Token::basic(
+    ))))));
+    let rhs = AdditiveExpr::Wrapped(Term::Wrapped(PrefixExpr::Wrapped(Factor::Identifier(Identifier(Token::basic(
         "b",
         TokenKind::Identifier,
-    )))));
+    ))))));
     let expected = Statement::Return(
         Token::basic("return", TokenKind::Return),
         Box::new(EqualityExpr::Wrapped(RelationalExpr::RelationalExpr(

@@ -274,12 +274,7 @@ impl AsParent<Term> for PrefixExpr {
     }
 }
 
-impl EquivalentTo for PrefixExpr {
-    fn is_equivalent_to(&self, other: &PrefixExpr) -> bool {
-        // TODO: implement me
-        false
-    }
-}
+impl_equivalent_to_unop!(PrefixExpr; Invert, Negate);
 
 impl ToExpression for PrefixExpr {
     fn to_expression(&self) -> Expression {

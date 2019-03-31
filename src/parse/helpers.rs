@@ -16,6 +16,30 @@ pub trait AsParent<T> {
     fn as_parent(&self) -> Option<T>;
 }
 
+macro_rules! impl_equivalent_to_unop {
+    ($this:ident; $( $op:tt ),+) => {
+        impl EquivalentTo for $this {
+            fn is_equivalent_to(&self, other: &Self) -> bool {
+                match (self, other) {
+                    ($this::Wrapped(l), $this::Wrapped(r)) => l.is_equivalent_to(r),
+                    $(
+                        ($this::$op(l), $this::$op(r)) => l.is_equivalent_to(r),
+                        ($this::Wrapped(l), $this::$op(_)) => match l.as_parent() {
+                            Some(l) => l.is_equivalent_to(other),
+                            None => false,
+                        },
+                        ($this::$op(_), $this::Wrapped(r)) => match r.as_parent() {
+                            Some(r) => r.is_equivalent_to(self),
+                            None => false,
+                        },
+                    )*
+                    _ => false,
+                }
+            }
+        }
+    }
+}
+
 macro_rules! impl_equivalent_to_binop {
     ($this:ident) => {
         impl EquivalentTo for $this {
