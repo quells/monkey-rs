@@ -12,8 +12,8 @@ pub trait ToChild<T> {
     fn to_child(&self) -> T;
 }
 
-pub trait AsParent<T> {
-    fn as_parent(&self) -> Option<T>;
+pub trait ToParent<T> {
+    fn to_parent(&self) -> Option<T>;
 }
 
 macro_rules! impl_equivalent_to_unop {
@@ -24,11 +24,11 @@ macro_rules! impl_equivalent_to_unop {
                     ($this::Wrapped(l), $this::Wrapped(r)) => l.is_equivalent_to(r),
                     $(
                         ($this::$op(l), $this::$op(r)) => l.is_equivalent_to(r),
-                        ($this::Wrapped(l), $this::$op(_)) => match l.as_parent() {
+                        ($this::Wrapped(l), $this::$op(_)) => match l.to_parent() {
                             Some(l) => l.is_equivalent_to(other),
                             None => false,
                         },
-                        ($this::$op(_), $this::Wrapped(r)) => match r.as_parent() {
+                        ($this::$op(_), $this::Wrapped(r)) => match r.to_parent() {
                             Some(r) => r.is_equivalent_to(self),
                             None => false,
                         },
@@ -49,11 +49,11 @@ macro_rules! impl_equivalent_to_binop {
                     ($this::$this(ll, lop, lr), $this::$this(rl, rop, rr)) => {
                         lop == rop && ll.is_equivalent_to(rl) && lr.is_equivalent_to(rr)
                     }
-                    ($this::Wrapped(l), $this::$this(_, _, _)) => match l.as_parent() {
+                    ($this::Wrapped(l), $this::$this(_, _, _)) => match l.to_parent() {
                         Some(l) => l.is_equivalent_to(other),
                         None => false,
                     },
-                    ($this::$this(_, _, _), $this::Wrapped(r)) => match r.as_parent() {
+                    ($this::$this(_, _, _), $this::Wrapped(r)) => match r.to_parent() {
                         Some(r) => r.is_equivalent_to(self),
                         None => false,
                     },

@@ -88,15 +88,15 @@ impl_display_binop!(
     NotEqual, "!="
 );
 
-impl AsParent<Factor> for EqualityExpr {
-    fn as_parent(&self) -> Option<Factor> {
+impl ToParent<Factor> for EqualityExpr {
+    fn to_parent(&self) -> Option<Factor> {
         let relational = wrapped_or_return_none!(self, EqualityExpr);
         let additive = wrapped_or_return_none!(relational, RelationalExpr);
         let term = wrapped_or_return_none!(additive, AdditiveExpr);
         let prefix = wrapped_or_return_none!(term, Term);
         let factor = wrapped_or_return_none!(prefix, PrefixExpr);
         match factor {
-            Factor::Wrapped(e) => e.as_parent(),
+            Factor::Wrapped(e) => e.to_parent(),
             _ => Some(factor.clone()),
         }
     }
@@ -140,8 +140,8 @@ impl_display_binop!(
     GreaterThanEqual, ">="
 );
 
-impl AsParent<EqualityExpr> for RelationalExpr {
-    fn as_parent(&self) -> Option<EqualityExpr> {
+impl ToParent<EqualityExpr> for RelationalExpr {
+    fn to_parent(&self) -> Option<EqualityExpr> {
         let additive = wrapped_or_return_none!(self, RelationalExpr);
         let term = wrapped_or_return_none!(additive, AdditiveExpr);
         let prefix = wrapped_or_return_none!(term, Term);
@@ -186,8 +186,8 @@ impl_display_binop!(
     Subtract, "-"
 );
 
-impl AsParent<RelationalExpr> for AdditiveExpr {
-    fn as_parent(&self) -> Option<RelationalExpr> {
+impl ToParent<RelationalExpr> for AdditiveExpr {
+    fn to_parent(&self) -> Option<RelationalExpr> {
         let term = wrapped_or_return_none!(self, AdditiveExpr);
         let prefix = wrapped_or_return_none!(term, Term);
         let factor = wrapped_or_return_none!(prefix, PrefixExpr);
@@ -230,8 +230,8 @@ impl_display_binop!(
     Divide, "/"
 );
 
-impl AsParent<AdditiveExpr> for Term {
-    fn as_parent(&self) -> Option<AdditiveExpr> {
+impl ToParent<AdditiveExpr> for Term {
+    fn to_parent(&self) -> Option<AdditiveExpr> {
         let prefix = wrapped_or_return_none!(self, Term);
         let factor = wrapped_or_return_none!(prefix, PrefixExpr);
         let equality = wrapped_or_return_none!(factor, Factor);
@@ -263,8 +263,8 @@ pub enum PrefixExpr {
     Negate(Factor),
 }
 
-impl AsParent<Term> for PrefixExpr {
-    fn as_parent(&self) -> Option<Term> {
+impl ToParent<Term> for PrefixExpr {
+    fn to_parent(&self) -> Option<Term> {
         let factor = wrapped_or_return_none!(self, PrefixExpr);
         let equality = wrapped_or_return_none!(factor, Factor);
         let unboxed = *(*equality).clone();
@@ -311,8 +311,8 @@ pub enum Factor {
     FunctionCall(Token, Vec<Expression>),
 }
 
-impl AsParent<PrefixExpr> for Factor {
-    fn as_parent(&self) -> Option<PrefixExpr> {
+impl ToParent<PrefixExpr> for Factor {
+    fn to_parent(&self) -> Option<PrefixExpr> {
         let equality = wrapped_or_return_none!(self, Factor);
         let unboxed = *(*equality).clone();
         let relational = wrapped_or_return_none!(unboxed, EqualityExpr);
@@ -342,11 +342,11 @@ impl EquivalentTo for Factor {
                     .all(|b| b);
                 id_l.is_equivalent_to(id_r) && param_acc
             }
-            (Factor::Wrapped(l), _) => match l.as_parent() {
+            (Factor::Wrapped(l), _) => match l.to_parent() {
                 Some(l) => l.is_equivalent_to(other),
                 None => false,
             },
-            (_, Factor::Wrapped(r)) => match r.as_parent() {
+            (_, Factor::Wrapped(r)) => match r.to_parent() {
                 Some(r) => r.is_equivalent_to(self),
                 None => false,
             },
