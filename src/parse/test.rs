@@ -19,6 +19,29 @@ fn setup(src: &str, expected_statement_count: usize) -> Program {
 }
 
 #[test]
+fn raw_expression() {
+    for (src, statement_count) in [
+        (";", 0),
+        ("a", 1),
+        ("123", 1),
+        ("1 + 2", 1),
+        ("2 * 2", 1),
+        ("42 == 6*7", 1),
+        ("true", 1),
+        ("!a", 1),
+        ("!!--a", 1),
+    ].iter() {
+        let tokens = lex(src);
+        let parsed = parse(&tokens);
+
+        assert!(parsed.is_ok(), src);
+        
+        let parsed = parsed.unwrap();
+        assert_eq!(parsed.statements.len(), *statement_count, "{}", src);
+    }
+}
+
+#[test]
 fn assign_wrapped() {
     let src = "let a = (123);";
 

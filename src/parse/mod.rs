@@ -143,10 +143,10 @@ impl Parser {
                 self.eat(TokenKind::Semicolon)?;
                 Ok(Statement::Return(_return, value))
             }
-            _ => Err(ParseError::UnexpectedToken(
-                vec![TokenKind::Let],
-                first_token,
-            )),
+            _ => {
+                let expr = self.next_expression()?;
+                Ok(Statement::Expression(expr))
+            },
         }
     }
 

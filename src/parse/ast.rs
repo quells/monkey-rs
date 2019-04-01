@@ -37,6 +37,7 @@ impl Program {
 pub enum Statement {
     Assignment(Token, Identifier, Expression), // let `a` = `b`;
     Return(Token, Expression),                 // return `a`;
+    Expression(Expression),                    // 1 + 2
 }
 
 impl EquivalentTo for Statement {
@@ -53,6 +54,7 @@ impl EquivalentTo for Statement {
             (Statement::Return(return_l, value_l), Statement::Return(return_r, value_r)) => {
                 return_l.is_equivalent_to(return_r) && value_l.is_equivalent_to(value_r)
             }
+            (Statement::Expression(l), Statement::Expression(r)) => l.is_equivalent_to(r),
             _ => false,
         }
     }
@@ -63,6 +65,7 @@ impl std::fmt::Display for Statement {
         match self {
             Statement::Assignment(_, id, value) => format!("let {} = {};", id, value),
             Statement::Return(_, value) => format!("return {};", value),
+            Statement::Expression(value) => return value.fmt(f),
         }
         .fmt(f)
     }
