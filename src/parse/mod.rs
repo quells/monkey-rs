@@ -146,7 +146,7 @@ impl Parser {
             _ => {
                 let expr = self.next_expression()?;
                 Ok(Statement::Expression(expr))
-            },
+            }
         }
     }
 

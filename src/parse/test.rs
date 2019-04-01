@@ -30,12 +30,14 @@ fn raw_expression() {
         ("true", 1),
         ("!a", 1),
         ("!!--a", 1),
-    ].iter() {
+    ]
+    .iter()
+    {
         let tokens = lex(src);
         let parsed = parse(&tokens);
 
         assert!(parsed.is_ok(), src);
-        
+
         let parsed = parsed.unwrap();
         assert_eq!(parsed.statements.len(), *statement_count, "{}", src);
     }
