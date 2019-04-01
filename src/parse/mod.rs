@@ -188,6 +188,12 @@ impl Parser {
 
     fn next_factor(&mut self, first_token: Token) -> Result<Factor, ParseError> {
         match first_token.kind {
+            TokenKind::LParen => {
+                self.eat(TokenKind::LParen)?;
+                let inner = self.next_expression()?;
+                self.eat(TokenKind::RParen)?;
+                Ok(Factor::Wrapped(inner))
+            }
             TokenKind::Integer => {
                 let int = self.eat(TokenKind::Integer)?;
                 let parsed = match isize::from_str(&int.literal) {
@@ -205,6 +211,7 @@ impl Parser {
                 };
                 match next_token.kind {
                     TokenKind::LParen => {
+                        // function call
                         self.eat(TokenKind::LParen)?;
                         let mut params = Vec::new();
                         loop {
@@ -233,7 +240,7 @@ impl Parser {
                 }
             }
             _ => Err(ParseError::UnexpectedToken(
-                vec![TokenKind::Integer, TokenKind::Identifier],
+                vec![TokenKind::LParen, TokenKind::Integer, TokenKind::Identifier],
                 first_token,
             )),
         }

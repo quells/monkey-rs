@@ -20,6 +20,38 @@ fn setup(src: &str, expected_statement_count: usize) -> Program {
 }
 
 #[test]
+fn assign_wrapped() {
+    let src = "let a = (123);";
+
+    let actual = setup(&src, 1).statements.into_iter().next().unwrap();
+
+    let expected = Statement::Assignment(
+        Token::basic("let", TokenKind::Let),
+        Identifier(Token::basic("a", TokenKind::Identifier)),
+        Factor::Integer(Token::basic("123", TokenKind::Integer), 123).to_expression(),
+    );
+
+    let ok = actual.is_equivalent_to(&expected);
+    assert!(ok);
+}
+
+#[test]
+fn assign_nested_wrapped() {
+    let src = "let a = ((123));";
+
+    let actual = setup(&src, 1).statements.into_iter().next().unwrap();
+
+    let expected = Statement::Assignment(
+        Token::basic("let", TokenKind::Let),
+        Identifier(Token::basic("a", TokenKind::Identifier)),
+        Factor::Integer(Token::basic("123", TokenKind::Integer), 123).to_expression(),
+    );
+
+    let ok = actual.is_equivalent_to(&expected);
+    assert!(ok);
+}
+
+#[test]
 fn assign_int() {
     let src = "let abc = 123;";
     let actual = setup(&src, 1).statements.into_iter().next().unwrap();
@@ -128,7 +160,7 @@ fn assign_missing_token() {
     assert!(parsed.is_err());
     actual = parsed.err().unwrap();
     expected = ParseError::UnexpectedToken(
-        vec![TokenKind::Integer, TokenKind::Identifier],
+        vec![TokenKind::LParen, TokenKind::Integer, TokenKind::Identifier],
         Token::basic(";", TokenKind::Semicolon),
     );
     println!("{:?}", actual);
