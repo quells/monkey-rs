@@ -69,7 +69,7 @@ macro_rules! impl_display_binop_node {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 match self {
                     $this::Wrapped(w) => w.fmt(f),
-                    $this::$child(l, op, r) => write!(f, "{} {} {}", l, op, r),
+                    $this::$child(l, op, r) => write!(f, "({} {} {})", l, op, r),
                 }
             }
         }
