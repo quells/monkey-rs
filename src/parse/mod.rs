@@ -202,6 +202,14 @@ impl Parser {
                 };
                 Ok(Factor::Integer(int, parsed))
             }
+            TokenKind::True => {
+                self.eat(TokenKind::True)?;
+                Ok(Factor::Boolean(first_token, true))
+            }
+            TokenKind::False => {
+                self.eat(TokenKind::False)?;
+                Ok(Factor::Boolean(first_token, false))
+            }
             TokenKind::Identifier => {
                 let id = self.eat(TokenKind::Identifier)?;
                 let default = Factor::Identifier(Identifier(id.clone()));
@@ -240,7 +248,13 @@ impl Parser {
                 }
             }
             _ => Err(ParseError::UnexpectedToken(
-                vec![TokenKind::LParen, TokenKind::Integer, TokenKind::Identifier],
+                vec![
+                    TokenKind::LParen,
+                    TokenKind::Integer,
+                    TokenKind::True,
+                    TokenKind::False,
+                    TokenKind::Identifier,
+                ],
                 first_token,
             )),
         }

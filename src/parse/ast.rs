@@ -308,6 +308,7 @@ pub enum Factor {
     Wrapped(Expression),
     Identifier(Identifier),
     Integer(Token, isize),
+    Boolean(Token, bool),
     FunctionCall(Token, Vec<Expression>),
 }
 
@@ -331,6 +332,7 @@ impl EquivalentTo for Factor {
             (Factor::Integer(literal_l, parsed_l), Factor::Integer(literal_r, parsed_r)) => {
                 literal_l.is_equivalent_to(literal_r) && parsed_l == parsed_r
             }
+            (Factor::Boolean(_, l), Factor::Boolean(_, r)) => l == r,
             (Factor::FunctionCall(id_l, params_l), Factor::FunctionCall(id_r, params_r)) => {
                 if params_l.len() != params_r.len() {
                     return false;
@@ -367,6 +369,7 @@ impl ToExpression for Factor {
             Factor::Wrapped(e) => e.clone(),
             Factor::Identifier(_) => wrapped(self),
             Factor::Integer(_, _) => wrapped(self),
+            Factor::Boolean(_, _) => wrapped(self),
             Factor::FunctionCall(_, _) => wrapped(self),
         }
     }
@@ -378,6 +381,7 @@ impl std::fmt::Display for Factor {
             Factor::Wrapped(e) => e.fmt(f),
             Factor::Identifier(t) => t.0.literal.fmt(f),
             Factor::Integer(t, _) => t.literal.fmt(f),
+            Factor::Boolean(_, b) => if *b { "true" } else { "false" }.fmt(f),
             Factor::FunctionCall(id, params) => {
                 let param_strs = match params.split_first() {
                     Some((first, rest)) => rest

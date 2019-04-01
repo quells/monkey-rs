@@ -6,7 +6,6 @@ use crate::parse::*;
 fn setup(src: &str, expected_statement_count: usize) -> Program {
     let tokens = lex(&src);
     let parsed = parse(&tokens);
-    println!("{:?}", parsed);
 
     assert!(
         parsed.is_ok(),
@@ -160,7 +159,13 @@ fn assign_missing_token() {
     assert!(parsed.is_err());
     actual = parsed.err().unwrap();
     expected = ParseError::UnexpectedToken(
-        vec![TokenKind::LParen, TokenKind::Integer, TokenKind::Identifier],
+        vec![
+            TokenKind::LParen,
+            TokenKind::Integer,
+            TokenKind::True,
+            TokenKind::False,
+            TokenKind::Identifier,
+        ],
         Token::basic(";", TokenKind::Semicolon),
     );
     println!("{:?}", actual);
@@ -492,6 +497,38 @@ fn negation() {
 }
 
 #[test]
+fn return_true() {
+    let src = "return true;";
+    let actual = setup(&src, 1).statements.into_iter().next().unwrap();
+    let expected = Statement::Return(
+        Token::basic("return", TokenKind::Return),
+        Box::new(EqualityExpr::Wrapped(RelationalExpr::Wrapped(
+            AdditiveExpr::Wrapped(Term::Wrapped(PrefixExpr::Wrapped(Factor::Boolean(
+                Token::basic("true", TokenKind::True),
+                true,
+            )))),
+        ))),
+    );
+    assert!(actual.is_equivalent_to(&expected));
+}
+
+#[test]
+fn return_false() {
+    let src = "return false;";
+    let actual = setup(&src, 1).statements.into_iter().next().unwrap();
+    let expected = Statement::Return(
+        Token::basic("return", TokenKind::Return),
+        Box::new(EqualityExpr::Wrapped(RelationalExpr::Wrapped(
+            AdditiveExpr::Wrapped(Term::Wrapped(PrefixExpr::Wrapped(Factor::Boolean(
+                Token::basic("false", TokenKind::False),
+                false,
+            )))),
+        ))),
+    );
+    assert!(actual.is_equivalent_to(&expected));
+}
+
+#[test]
 fn operator_precedence() {
     for (implicit_original, explicit) in [
         ("let a = 1 + 2 + 3;", "let a = (1 + 2) + 3;"),
@@ -499,13 +536,22 @@ fn operator_precedence() {
         ("let a = 1 * 2 * 3;", "let a = ((1 * 2) * 3);"),
         ("let x = a * b / c;", "let x = ((a * b) / c);"),
         ("let x = a + b / c;", "let x = (a + (b / c));"),
-        ("return a + b * c + d / e - f;", "return (((a + (b * c)) + (d / e)) - f);"),
+        (
+            "return a + b * c + d / e - f;",
+            "return (((a + (b * c)) + (d / e)) - f);",
+        ),
         ("return -a * b;", "return ((-a) * b);"),
         ("return !-a;", "return (!(-a));"),
         ("return 5 > 4 == 3 < 4;", "return (5 > 4) == (3 < 4);"),
         ("return 5 > 4 != 3 < 4;", "return (5 > 4) != (3 < 4);"),
-        ("return 3 + 4 * 5 == 3*1 + 4*5;", "return (3 + (4 * 5)) == ((3*1) + (4*5));"),
-    ].iter() {
+        (
+            "return 3 + 4 * 5 == 3*1 + 4*5;",
+            "return (3 + (4 * 5)) == ((3*1) + (4*5));",
+        ),
+        ("return 3 > 5 == false;", "return ((3 > 5) == false);"),
+    ]
+    .iter()
+    {
         let implicit = lex(implicit_original);
         let implicit = parse(&implicit).unwrap();
         let implicit = &implicit.statements[0];
