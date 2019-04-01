@@ -181,7 +181,7 @@ impl Parser {
         Slash, Divide
     );
 
-    impl_next_unop!(next_prefix_expr; PrefixExpr; next_factor;
+    impl_next_repeatable_unop!(next_prefix_expr; PrefixExpr; next_factor;
         Exclamation, Invert;
         Minus, Negate
     );

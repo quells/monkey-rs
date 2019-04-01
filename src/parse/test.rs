@@ -490,3 +490,30 @@ fn negation() {
     );
     assert!(actual.is_equivalent_to(&expected));
 }
+
+#[test]
+fn operator_precedence() {
+    for (implicit_original, explicit) in [
+        ("let a = 1 + 2 + 3;", "let a = (1 + 2) + 3;"),
+        ("let a = 1 + 2 - 3;", "let a = ((1 + 2) - 3);"),
+        ("let a = 1 * 2 * 3;", "let a = ((1 * 2) * 3);"),
+        ("let x = a * b / c;", "let x = ((a * b) / c);"),
+        ("let x = a + b / c;", "let x = (a + (b / c));"),
+        ("return a + b * c + d / e - f;", "return (((a + (b * c)) + (d / e)) - f);"),
+        ("return -a * b;", "return ((-a) * b);"),
+        ("return !-a;", "return (!(-a));"),
+        ("return 5 > 4 == 3 < 4;", "return (5 > 4) == (3 < 4);"),
+        ("return 5 > 4 != 3 < 4;", "return (5 > 4) != (3 < 4);"),
+        ("return 3 + 4 * 5 == 3*1 + 4*5;", "return (3 + (4 * 5)) == ((3*1) + (4*5));"),
+    ].iter() {
+        let implicit = lex(implicit_original);
+        let implicit = parse(&implicit).unwrap();
+        let implicit = &implicit.statements[0];
+
+        let explicit = lex(explicit);
+        let explicit = parse(&explicit).unwrap();
+        let explicit = &explicit.statements[0];
+
+        assert!(implicit.is_equivalent_to(&explicit), implicit_original);
+    }
+}
